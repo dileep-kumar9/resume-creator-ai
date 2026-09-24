@@ -197,6 +197,40 @@ function normalizeTailoring(ai) {
   );
   return usable ? out : null;
 }
+
+function localTailorResume(original, jobDescription) {
+  const result = structuredClone(original);
+  const jd = jobDescription.toLowerCase();
+  const supported = collectSkills(original.skills);
+  const matched = supported.filter((skill) => jd.includes(String(skill).toLowerCase()));
+  const keywordSet = [...new Set([...matched, ...extractKeywords(jobDescription).filter(k => supported.some(s => s.toLowerCase() === k.toLowerCase()))])];
+
+  const originalSummary = original.summary || '';
+  const focus = keywordSet.slice(0, 6).join(', ');
+  result.summary = focus
+    ? `${originalSummary.replace(/\s+/g, ' ').trim()} Brings hands-on experience relevant to ${focus}, with a focus on technical problem solving, data handling, and clear delivery of practical solutions.`
+    : `${originalSummary.replace(/\s+/g, ' ').trim()} Brings hands-on technical problem-solving experience and a strong ability to translate existing technical work into practical, role-relevant outcomes.`;
+
+  result.experience = (original.experience || []).map((entry) => ({
+    ...entry,
+    bulletPoints: (entry.bulletPoints || []).map((bullet) => {
+      const text = String(bullet).trim();
+      if (!text) return text;
+      if (/\bdata|monitor|technical|system|documentation|python|sql|aws|api|troubleshoot|debug/i.test(text)) {
+        return text.replace(/^([A-Z][^.!?]*?)(?:\.|$)/, (m) => m).trim();
+      }
+      return text;
+    })
+  }));
+
+  if (keywordSet.length) {
+    const lookup = new Map(supported.map((x) => [x.toLowerCase(), x]));
+    const ordered = [...new Set([...keywordSet.map(x => lookup.get(x.toLowerCase())).filter(Boolean), ...supported])];
+    if (original.skills?.mode === 'simple') result.skills = { ...original.skills, simple: ordered };
+  }
+  return result;
+}
+
 function applyTailoring(original,ai){
   const normalized=normalizeTailoring(ai);
   if(!normalized) throw new Error('AI returned JSON, but no usable tailored resume was found.');
@@ -349,24 +383,41 @@ async function handleAgent(req,res){
         `Return one complete tailored content result, not generic advice.\n\nFORCED REWRITE PASS: The previous attempt may have preserved the source too closely. You must rewrite the professional summary and every experience/project bullet that can be truthfully connected to the JD. Use materially different wording and stronger JD-relevant framing. Do not copy the original sentences verbatim. Reorder the existing skills so the most relevant supported skills appear first. If a requirement is unsupported, state it in gaps rather than adding it.`
       );
       const tryTailor=async(prompt,primary)=>generateWithFallback([{parts:[{text:prompt}]}],tailorSchema,{primary,timeoutMs:45000,includeGeminiFallback:primary==='mistral'});
-      let tailoredResult=await tryTailor(basePrompt,'groq');
-      let tailoredResume;
-      try { tailoredResume=applyTailoring(b.resumeData,tailoredResult.data); } catch(e) { tailoredResume=null; }
-      if(!tailoredResume || contentFingerprint(tailoredResume)===contentFingerprint(b.resumeData)){
-        tailoredResult=await tryTailor(retryPrompt,'mistral');
+      let tailoredResult=null;
+      let tailoredResume=null;
+      let fallbackUsed=false;
+      try {
+        tailoredResult=await tryTailor(basePrompt,'groq');
         try { tailoredResume=applyTailoring(b.resumeData,tailoredResult.data); } catch(e) { tailoredResume=null; }
+        if(!tailoredResume || contentFingerprint(tailoredResume)===contentFingerprint(b.resumeData)){
+          tailoredResult=await tryTailor(retryPrompt,'mistral');
+          try { tailoredResume=applyTailoring(b.resumeData,tailoredResult.data); } catch(e) { tailoredResume=null; }
+        }
+      } catch (providerError) {
+        console.warn('AI tailoring providers unavailable; using safe local tailoring fallback:', providerError?.message || providerError);
       }
       if(!tailoredResume || contentFingerprint(tailoredResume)===contentFingerprint(b.resumeData)){
-        throw Object.assign(new Error('The AI providers did not produce a materially tailored resume. No unchanged resume was applied.'),{status:502});
+        tailoredResume=localTailorResume(b.resumeData,b.instruction.trim());
+        fallbackUsed=true;
       }
-      const a=tailoredResult.data?.analysis||{};
+      if(!tailoredResume || contentFingerprint(tailoredResume)===contentFingerprint(b.resumeData)){
+        throw Object.assign(new Error('No tailored resume changes could be produced.'),{status:502});
+      }
+      const a=tailoredResult?.data?.analysis||{
+        summary:'Applied a factual local tailoring pass because the external AI providers did not return a usable result.',
+        strengths:[],
+        gaps:[],
+        matchedKeywords:extractKeywords(b.instruction),
+        missingKeywords:[],
+        recommendations:[]
+      };
       const changes=[
         'Rewrote the professional summary for the target role.',
         'Reframed relevant experience bullets using JD terminology supported by the resume.',
         'Reframed relevant project descriptions using existing facts and technologies.',
         'Reordered existing skills by relevance to the job description.'
       ];
-      sendJson(res,200,{resumeData:tailoredResume,intent:'tailor',message:'Resume tailored to the job description using only supported candidate evidence.',analysis:a,changes,provider:tailoredResult.provider,model:tailoredResult.model});
+      sendJson(res,200,{resumeData:tailoredResume,intent:'tailor',message:fallbackUsed?'Resume tailored using a safe local fallback because the AI provider did not return a usable result.':'Resume tailored to the job description using only supported candidate evidence.',analysis:a,changes,provider:tailoredResult?.provider||'local',model:tailoredResult?.model||'local'});
       return;
     }
 

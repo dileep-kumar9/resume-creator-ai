@@ -11,15 +11,12 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   const { state } = useResume();
   const { resumeData } = state;
   const previewHostRef = useRef<HTMLDivElement>(null);
-  const [hostSize, setHostSize] = useState({ width: 500, height: 720 });
+  const [hostWidth, setHostWidth] = useState(500);
 
   useEffect(() => {
     const el = previewHostRef.current;
     if (!el) return;
-    const update = () => setHostSize({
-      width: Math.max(1, el.clientWidth - 16),
-      height: Math.max(1, el.clientHeight - 16)
-    });
+    const update = () => setHostWidth(Math.max(1, el.clientWidth - 36));
     update();
     const observer = new ResizeObserver(update);
     observer.observe(el);
@@ -74,15 +71,12 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   const isA4 = resumeData.pageFormat === 'a4';
   const pageWidth = isA4 ? 794 : 816; // A4: 210mm = 794px, Letter: 8.5in = 816px
   const pageHeight = isA4 ? 1123 : 1056; // A4: 297mm = 1123px, Letter: 11in = 1056px
-  const containerWidth = artifact ? hostSize.width : 860;
-  const containerHeight = artifact ? hostSize.height : 650;
-  const scaleWidth = containerWidth / pageWidth;
-  // In the Created Resume artifact, width is the user's adjustable constraint.
-  // Do not use the viewport height to shrink the entire page: let the artifact
-  // scroll vertically so the resume remains readable.
-  const scale = artifact
-    ? Math.min(1, scaleWidth)
-    : Math.min(1, scaleWidth, containerHeight / pageHeight);
+  const containerWidth = artifact ? hostWidth : 860;
+  const scaleWidth = Math.max(0.05, containerWidth / pageWidth);
+  // In the Created Resume artifact the ONLY sizing constraint is the panel
+  // width. The page is allowed to become taller than the viewport and the
+  // artifact scrolls vertically, exactly like a document/artifact viewer.
+  const scale = artifact ? Math.min(1, scaleWidth) : Math.min(1, scaleWidth, 650 / pageHeight);
 
   return (
     <div ref={previewHostRef} className="w-full h-full flex items-center justify-center p-2">
@@ -91,8 +85,9 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
         style={{
           width: pageWidth * scale,
           height: pageHeight * scale,
-          maxWidth: '100%',
-          maxHeight: '100%'
+          maxWidth: 'none',
+          maxHeight: 'none',
+          flex: '0 0 auto'
         }}
       >
         <div 

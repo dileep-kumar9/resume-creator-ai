@@ -218,7 +218,18 @@ export async function parseResumeWithAI(input: { text?: string; pdfBase64?: stri
         if (!extractedText.trim()) throw new Error('The PDF contains no extractable text.');
         return await request({ text: extractedText });
       } catch (fallbackError: any) {
-        throw new Error(`Gemini PDF parsing was unavailable, and the text fallback also failed: ${fallbackError?.message || 'unknown error'}`);
+        // Last-resort local extraction keeps the uploaded resume usable even
+        // when every external AI provider is temporarily unavailable. The
+        // original uploaded template is still preserved by importResumeFromFile.
+        try {
+          const binary = atob(input.pdfBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const file = new File([bytes], 'resume.pdf', { type: 'application/pdf' });
+          const extractedText = await extractResumeText(file);
+          if (extractedText.trim()) return parseResumeHeuristically(extractedText);
+        } catch {}
+        throw new Error(`Resume parsing is temporarily unavailable. Please try again. ${fallbackError?.message || ''}`.trim());
       }
     }
     if (error?.name === 'AbortError') throw new Error('Resume parsing timed out. Please try again.');

@@ -53,6 +53,20 @@ export const TemplateSelector: React.FC = () => {
           </Card>
         )}
 
+        {!state.resumeData.originalTemplate && (
+          <Card className="border-2 border-dashed">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold text-base">Original Uploaded Resume</h3>
+                  <p className="text-sm text-muted-foreground mt-1">Upload a PDF or DOCX to preserve the original document as a selectable template. It will never be replaced automatically.</p>
+                </div>
+                <Badge variant="outline">Not uploaded</Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {TEMPLATE_CONFIGS.map((template) => (
             <Card 

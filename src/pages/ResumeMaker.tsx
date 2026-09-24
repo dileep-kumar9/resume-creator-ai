@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ResumeProvider, useResume } from '../contexts/ResumeContext';
 import { ResumeForm } from '../components/form/ResumeForm';
 import { ResumePreview } from '../components/preview/ResumePreview';
@@ -35,6 +35,7 @@ const AgentWorkspace:React.FC=()=>{
   const fileRef=useRef<HTMLInputElement>(null);
   const importRef=useRef<HTMLInputElement>(null);
   const chatScrollRef=useRef<HTMLDivElement>(null);
+  const chatInputRef=useRef<HTMLTextAreaElement>(null);
 
   // ChatGPT-style behavior: every new user/assistant message and the loading
   // state keeps the conversation viewport at the newest content. The user can
@@ -46,6 +47,20 @@ const AgentWorkspace:React.FC=()=>{
       el.scrollTo({top:el.scrollHeight,behavior:'smooth'});
     });
   },[messages.length,loading]);
+
+  const resizeChatInput=()=>{
+    const el=chatInputRef.current;
+    if(!el)return;
+    el.style.height='auto';
+    const maxHeight=260;
+    const next=Math.min(Math.max(el.scrollHeight,34),maxHeight);
+    el.style.height=`${next}px`;
+    el.style.overflowY=el.scrollHeight>maxHeight?'auto':'hidden';
+  };
+
+  useLayoutEffect(()=>{
+    resizeChatInput();
+  },[prompt]);
 
   const clearAttachment=()=>{
     setAttachment(null);
@@ -78,7 +93,9 @@ const AgentWorkspace:React.FC=()=>{
     const instruction=prompt.trim() || (attachmentKind==='resume' ? 'Use this uploaded file as my resume.' : 'Analyze the attached reference document and help me improve my resume.');
     const att=attachment?.name;
     setMessages(m=>[...m,{id:crypto.randomUUID(),role:'user',text:instruction,attachment:att}]);
-    setPrompt(''); setLoading(true);
+    setPrompt('');
+    requestAnimationFrame(()=>{ if(chatInputRef.current) chatInputRef.current.style.height='34px'; });
+    setLoading(true);
 
     try{
       // A resume upload is parsed only after Send. This prevents sidebar/tab
@@ -118,15 +135,17 @@ const AgentWorkspace:React.FC=()=>{
       setHistory(h=>[...h,structuredClone(workingResume)]);
       const next = normalizeParsedResume(result.resumeData as ResumeData, workingResume);
 
-      // The AI agent is never allowed to choose a template. The template used
-      // for this request is the user's current selection and remains unchanged.
+      // The AI agent is NEVER allowed to change the selected template. Keep the
+      // user's exact selection, and keep the uploaded file metadata immutable.
       next.template = workingResume.template;
       if (workingResume.originalTemplate) {
         next.originalTemplate = {
           ...workingResume.originalTemplate,
+          // The uploaded document stays the original reference. When content is
+          // edited, the preview renders that content in the stored editable
+          // layout without changing the selected template value.
           tailored: true,
-          editableTemplate:
-            workingResume.originalTemplate.editableTemplate || 'modern-minimal'
+          editableTemplate: workingResume.originalTemplate.editableTemplate || 'modern-minimal'
         };
       }
       importResumeData(next);
@@ -175,8 +194,10 @@ const AgentWorkspace:React.FC=()=>{
     e.preventDefault();
     if(s.kind==='artifact'){
       const next=s.startWidth-(e.clientX-s.startX);
-      const min=600;
-      const max=Math.max(min,Math.min(980,window.innerWidth-360));
+      // GPT-style artifact: the panel has no artificial 600px floor. It can
+      // be dragged very narrow, with the center workspace taking the released space.
+      const min=0;
+      const max=Math.max(min,Math.min(1100,window.innerWidth-140));
       setArtifactWidth(Math.max(min,Math.min(max,next)));
     }else{
       const next=s.startWidth+(e.clientX-s.startX);
@@ -297,9 +318,10 @@ const AgentWorkspace:React.FC=()=>{
             <div className="resume-chat-composer">
               {attachment&&<div className="resume-chat-attachment"><FileText className="w-4 h-4"/><span>{attachment.name}</span><button type="button" onClick={()=>{setAttachment(null);setAttachmentText('');setAttachmentPdf('')}} aria-label="Remove attachment"><X className="w-3.5 h-3.5"/></button></div>}
               <Textarea
+                ref={chatInputRef}
                 rows={1}
                 value={prompt}
-                onChange={e=>setPrompt(e.target.value)}
+                onChange={e=>{setPrompt(e.target.value);requestAnimationFrame(resizeChatInput);}}
                 onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}}
                 placeholder="Message Resume Agent… paste a JD or ask for any resume change"
                 aria-label="Message Resume Agent"

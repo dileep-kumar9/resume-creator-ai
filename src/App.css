@@ -73,7 +73,6 @@
   right: 0;
   bottom: 0;
   width: min(560px, 44vw);
-  min-width: 390px;
   animation: resumeSidebarIn .18s ease-out;
 }
 .resume-artifact-paper {
@@ -119,7 +118,6 @@
 }
 .resume-artifact-sidebar {
   width: min(720px, 48vw) !important;
-  min-width: 560px !important;
   background: hsl(var(--background));
   border-left: 1px solid hsl(var(--border));
 }
@@ -138,7 +136,6 @@
 @media (max-width: 1100px) {
   .resume-artifact-sidebar {
     width: min(680px, 62vw) !important;
-    min-width: 460px !important;
   }
 }
 @media (max-width: 800px) {
@@ -436,7 +433,7 @@ html, body, #root {
   width: min(760px, 100%);
   min-height: 48px;
   margin: 0 auto;
-  padding: 4px 7px 4px 9px;
+  padding: 5px 7px 5px 9px;
   border: 1px solid hsl(var(--border));
   border-radius: 24px;
   background: hsl(var(--card));
@@ -447,9 +444,9 @@ html, body, #root {
   width: 100%;
   min-height: 34px !important;
   height: 34px !important;
-  max-height: 96px !important;
+  max-height: 260px !important;
   resize: none;
-  overflow-y: auto;
+  overflow-y: hidden;
   border: 0 !important;
   outline: 0 !important;
   background: transparent !important;
@@ -560,6 +557,9 @@ html, body, #root {
 
 .resume-artifact-preview {
   padding: 18px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
 .resume-artifact-editor > div {
@@ -607,8 +607,8 @@ html, body, #root {
 
 @media (max-width: 1250px) {
   .resume-artifact-panel {
-    flex-basis: min(var(--artifact-width, 760px), 62vw);
-    width: min(var(--artifact-width, 760px), 62vw);
+    flex-basis: var(--artifact-width, 760px);
+    width: var(--artifact-width, 760px);
   }
 }
 
@@ -618,8 +618,8 @@ html, body, #root {
   }
 
   .resume-artifact-panel {
-    flex-basis: min(var(--artifact-width, 760px), 68vw);
-    width: min(var(--artifact-width, 760px), 68vw);
+    flex-basis: var(--artifact-width, 760px);
+    width: var(--artifact-width, 760px);
   }
 }
 
