@@ -50,13 +50,13 @@ export const TechSidebarTemplate: React.FC<TemplateProps> = ({ data }) => {
           className="text-2xl font-bold mb-1"
           style={{ color: colors.primary }}
         >
-          {personalInfo.fullName || 'Your Name'}
+          {personalInfo.fullName}
         </h1>
         <h2 
           className="text-lg font-medium mb-3"
           style={{ color: colors.secondary }}
         >
-          {personalInfo.jobTitle || 'Your Job Title'}
+          {personalInfo.jobTitle}
         </h2>
         
         {/* Contact Info */}

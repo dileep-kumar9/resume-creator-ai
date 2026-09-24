@@ -1,4 +1,4 @@
-import { ResumeData, DEFAULT_COLORS, DEFAULT_SECTIONS } from '../types/resume';
+import { ResumeData, DEFAULT_COLORS, DEFAULT_SECTIONS, normalizeSkillLabels } from '../types/resume';
 import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import mammoth from 'mammoth/mammoth.browser';
@@ -78,8 +78,14 @@ export function normalizeParsedResume(parsed: ParsedResumePayload, base?: Resume
   if (parsed.skills) {
     fallback.skills = {
       mode: parsed.skills.mode === 'categorized' ? 'categorized' : 'simple',
-      simple: Array.isArray(parsed.skills.simple) ? parsed.skills.simple.filter(Boolean) : [],
-      categorized: Array.isArray(parsed.skills.categorized) ? parsed.skills.categorized.map((c: any) => ({ id: c.id || uid('skill'), name: c.name || 'Skills', skills: Array.isArray(c.skills) ? c.skills.filter(Boolean) : [] })) : []
+      simple: Array.isArray(parsed.skills.simple) ? normalizeSkillLabels(parsed.skills.simple) : [],
+      categorized: Array.isArray(parsed.skills.categorized)
+        ? parsed.skills.categorized.map((c: any) => ({
+            id: c.id || uid('skill'),
+            name: c.name || 'Skills',
+            skills: Array.isArray(c.skills) ? normalizeSkillLabels(c.skills) : []
+          }))
+        : []
     };
   }
   fallback.customSections = Array.isArray(parsed.customSections) ? parsed.customSections : fallback.customSections;

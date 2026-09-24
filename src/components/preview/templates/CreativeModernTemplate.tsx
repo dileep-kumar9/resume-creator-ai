@@ -56,10 +56,10 @@ export const CreativeModernTemplate: React.FC<TemplateProps> = ({ data }) => {
       >
         <div className="text-white">
           <h1 className="text-3xl font-bold mb-1">
-            {personalInfo.fullName || 'Your Name'}
+            {personalInfo.fullName}
           </h1>
           <h2 className="text-xl mb-3 opacity-90">
-            {personalInfo.jobTitle || 'Your Job Title'}
+            {personalInfo.jobTitle}
           </h2>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm opacity-90">
             {personalInfo.email && (

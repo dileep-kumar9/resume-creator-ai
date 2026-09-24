@@ -688,3 +688,77 @@ html, body, #root {
 .resume-artifact-panel {
   min-height: 0;
 }
+
+
+/* GPT-style sidebar behavior: collapsed means navigation-only.
+   Never squeeze the editor into a 64px rail. */
+.sidebar-collapsed .resume-studio-panel {
+  display: none !important;
+}
+
+/* Keep the expanded Studio sidebar comfortable and prevent tab labels
+   from colliding with one another. */
+.sidebar-expanded .resume-studio-app {
+  grid-template-columns: 320px minmax(0, 1fr);
+}
+.resume-studio-panel .p-6 {
+  padding: 14px !important;
+}
+.resume-studio-panel [role="tablist"] {
+  width: 100%;
+  min-width: 0;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+.resume-studio-panel [role="tab"] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+}
+
+/* GPT-like draggable divider for the Created Resume artifact. */
+.resume-artifact-resize-handle {
+  position: absolute;
+  left: -5px;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  z-index: 50;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.resume-artifact-resize-handle::before {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  background: transparent;
+  transition: background .15s ease;
+}
+.resume-artifact-resize-handle:hover::before,
+.resume-artifact-resize-handle:active::before {
+  background: hsl(var(--primary) / .45);
+}
+.resume-artifact-resize-handle span {
+  position: relative;
+  width: 3px;
+  height: 42px;
+  border-radius: 999px;
+  background: hsl(var(--muted-foreground) / .38);
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.resume-artifact-resize-handle:hover span,
+.resume-artifact-resize-handle:active span {
+  opacity: 1;
+}
+
+@media (max-width: 1000px) {
+  .sidebar-expanded .resume-studio-app {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+}

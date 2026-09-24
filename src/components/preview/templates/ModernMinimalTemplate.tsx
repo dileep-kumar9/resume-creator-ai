@@ -50,13 +50,13 @@ export const ModernMinimalTemplate: React.FC<TemplateProps> = ({ data }) => {
           className="text-3xl font-bold mb-2"
           style={{ color: colors.primary }}
         >
-          {personalInfo.fullName || 'Your Name'}
+          {personalInfo.fullName}
         </h1>
         <h2 
           className="text-xl font-medium mb-4"
           style={{ color: colors.secondary }}
         >
-          {personalInfo.jobTitle || 'Your Job Title'}
+          {personalInfo.jobTitle}
         </h2>
         
         {/* Contact Info */}

@@ -7,7 +7,7 @@ import { Textarea } from '../components/ui/textarea';
 import { useToast } from '../components/ui/use-toast';
 import { importResumeFromFile } from '../utils/resumeImportExport';
 import { exportResumeToPDF, exportResumeToDOCX } from '../utils/resumeExport';
-import { extractResumeText } from '../utils/resumeParser';
+import { extractResumeText, normalizeParsedResume } from '../utils/resumeParser';
 import { ResumeData } from '../types/resume';
 import { Menu, X, FileText, Palette, Settings, LayoutTemplate, Paperclip, Send, Loader2, Download, FileDown, RotateCcw, Sparkles, ChevronLeft } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -21,6 +21,7 @@ const AgentWorkspace:React.FC=()=>{
   const [sidebarOpen,setSidebarOpen]=useState(true);
   const [resumeOpen,setResumeOpen]=useState(false);
   const [resumeEditMode,setResumeEditMode]=useState(false);
+  const [artifactWidth,setArtifactWidth]=useState(560);
   const [panel,setPanel]=useState<SidePanel>('content');
   const [prompt,setPrompt]=useState('');
   const [loading,setLoading]=useState(false);
@@ -80,16 +81,21 @@ const AgentWorkspace:React.FC=()=>{
       }
       if(!result.resumeData)throw new Error('Agent returned no resume.');
       setHistory(h=>[...h,structuredClone(state.resumeData)]);
-      const next=result.resumeData as ResumeData;
-      // AI tailoring is content-only. Never let the model silently replace the
-      // user's selected template. Template changes are controlled by Templates.
-      // This also keeps "Original Uploaded Resume" selected after tailoring.
-      next.template=state.resumeData.template;
-      if(state.resumeData.originalTemplate && !next.originalTemplate){
-        next.originalTemplate=state.resumeData.originalTemplate;
-      }
-      if(state.resumeData.editableTemplate && !next.editableTemplate){
-        next.editableTemplate=state.resumeData.editableTemplate;
+      // Normalize the provider response against the current resume so partial or
+      // oddly-shaped AI output can never replace real candidate data with blanks.
+      const next = normalizeParsedResume(result.resumeData as ResumeData, state.resumeData);
+
+      // AI tailoring changes content, never the user's template choice.
+      // If the original uploaded PDF is selected, keep it selected as the
+      // reference, but render the tailored content through its editable layout.
+      next.template = state.resumeData.template;
+      if (state.resumeData.originalTemplate) {
+        next.originalTemplate = {
+          ...state.resumeData.originalTemplate,
+          tailored: true,
+          editableTemplate:
+            state.resumeData.originalTemplate.editableTemplate || 'modern-minimal'
+        };
       }
       importResumeData(next);
       setResumeOpen(true);
@@ -121,6 +127,27 @@ const AgentWorkspace:React.FC=()=>{
 
   const docx=()=>exportResumeToDOCX(state.resumeData);
   const panelMap:any={content:'form',customize:'customize',settings:'settings',templates:'templates'};
+  const startArtifactResize=(e:React.PointerEvent)=>{
+    if(!resumeOpen)return;
+    e.preventDefault();
+    const startX=e.clientX;
+    const startWidth=artifactWidth;
+    const onMove=(ev:PointerEvent)=>{
+      const next=startWidth-(ev.clientX-startX);
+      const max=Math.min(760, Math.max(480, window.innerWidth-420));
+      setArtifactWidth(Math.max(420, Math.min(max,next)));
+    };
+    const onUp=()=>{
+      document.removeEventListener('pointermove',onMove);
+      document.removeEventListener('pointerup',onUp);
+      document.body.style.cursor='';
+      document.body.style.userSelect='';
+    };
+    document.body.style.cursor='col-resize';
+    document.body.style.userSelect='none';
+    document.addEventListener('pointermove',onMove);
+    document.addEventListener('pointerup',onUp);
+  };
 
   const navItems:[
     SidePanel,string,React.ComponentType<{className?:string}>
@@ -226,7 +253,10 @@ const AgentWorkspace:React.FC=()=>{
           </div>
         </section>
 
-        {resumeOpen&&<aside className="resume-artifact-panel" aria-label="Created resume artifact">
+        {resumeOpen&&<aside className="resume-artifact-panel" style={{width:artifactWidth,flexBasis:artifactWidth}} aria-label="Created resume artifact">
+          <div className="resume-artifact-resize-handle" onPointerDown={startArtifactResize} title="Drag to resize created resume">
+            <span />
+          </div>
           <div className="resume-artifact-header">
             <div className="min-w-0">
               <div className="flex items-center gap-2"><FileText className="w-4 h-4 shrink-0"/><span className="font-semibold truncate">Created resume</span></div>
@@ -237,10 +267,13 @@ const AgentWorkspace:React.FC=()=>{
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <Button size="sm" variant={resumeEditMode?'secondary':'ghost'} onClick={()=>setResumeEditMode(v=>!v)}>
-                {resumeEditMode?'Preview':'Edit'}
-              </Button>
-              <Button size="icon" variant="ghost" title="Close artifact" aria-label="Close artifact" onClick={()=>setResumeOpen(false)}>
+              <Button
+                size="icon"
+                variant="ghost"
+                title="Close artifact"
+                aria-label="Close artifact"
+                onClick={()=>setResumeOpen(false)}
+              >
                 <X className="w-4 h-4"/>
               </Button>
             </div>
@@ -250,7 +283,19 @@ const AgentWorkspace:React.FC=()=>{
             <span className="text-xs text-muted-foreground">Live artifact</span>
             <div className="flex gap-1">
               <Button size="sm" variant="ghost" onClick={()=>setResumeEditMode(false)}>Preview</Button>
-              <Button size="sm" variant="ghost" onClick={()=>setResumeEditMode(true)}>Edit</Button>
+              <Button size="sm" variant={resumeEditMode?'secondary':'ghost'} onClick={()=>{
+                if (state.resumeData.template==='original-upload' && state.resumeData.originalTemplate && !state.resumeData.originalTemplate.tailored) {
+                  importResumeData({
+                    ...state.resumeData,
+                    originalTemplate: {
+                      ...state.resumeData.originalTemplate,
+                      tailored: true,
+                      editableTemplate: state.resumeData.originalTemplate.editableTemplate || 'modern-minimal'
+                    }
+                  });
+                }
+                setResumeEditMode(true);
+              }}>Edit</Button>
             </div>
           </div>
 

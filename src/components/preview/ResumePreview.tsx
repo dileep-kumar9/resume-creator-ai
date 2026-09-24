@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useResume } from '../../contexts/ResumeContext';
 import { TechSidebarTemplate } from './templates/TechSidebarTemplate';
 import { BusinessProfessionalTemplate } from './templates/BusinessProfessionalTemplate';
@@ -10,6 +10,21 @@ import { BJetProfessionalTemplate } from './templates/BJetProfessionalTemplate';
 export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = false }) => {
   const { state } = useResume();
   const { resumeData } = state;
+  const previewHostRef = useRef<HTMLDivElement>(null);
+  const [hostSize, setHostSize] = useState({ width: 500, height: 720 });
+
+  useEffect(() => {
+    const el = previewHostRef.current;
+    if (!el) return;
+    const update = () => setHostSize({
+      width: Math.max(1, el.clientWidth - 16),
+      height: Math.max(1, el.clientHeight - 16)
+    });
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [artifact]);
 
   const visualTemplate = resumeData.template === 'original-upload' && resumeData.originalTemplate?.tailored
     ? (resumeData.originalTemplate.editableTemplate || 'modern-minimal')
@@ -17,7 +32,7 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
 
   if (visualTemplate === 'original-upload' && resumeData.originalTemplate?.sourceDataUrl) {
     return (
-      <div className="w-full h-full flex items-center justify-center p-2">
+      <div ref={previewHostRef} className="w-full h-full flex items-center justify-center p-2">
         <div id="resume-content" className="w-full h-full bg-white shadow-xl overflow-hidden">
           {resumeData.originalTemplate.sourceFormat === 'pdf' ? (
             <iframe
@@ -59,14 +74,14 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   const isA4 = resumeData.pageFormat === 'a4';
   const pageWidth = isA4 ? 794 : 816; // A4: 210mm = 794px, Letter: 8.5in = 816px
   const pageHeight = isA4 ? 1123 : 1056; // A4: 297mm = 1123px, Letter: 11in = 1056px
-  const containerWidth = artifact ? 500 : 860;
-  const containerHeight = artifact ? 720 : 650;
+  const containerWidth = artifact ? hostSize.width : 860;
+  const containerHeight = artifact ? hostSize.height : 650;
   const scaleWidth = containerWidth / pageWidth;
   const scaleHeight = containerHeight / pageHeight;
-  const scale = Math.min(scaleWidth, scaleHeight); // Remove max limit for better fit
+  const scale = Math.min(1, scaleWidth, scaleHeight);
 
   return (
-    <div className="w-full h-full flex items-center justify-center p-2">
+    <div ref={previewHostRef} className="w-full h-full flex items-center justify-center p-2">
       <div 
         className="bg-white rounded-lg shadow-xl overflow-visible origin-center"
         style={{

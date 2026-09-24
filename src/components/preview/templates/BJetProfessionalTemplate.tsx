@@ -75,7 +75,7 @@ export const BJetProfessionalTemplate: React.FC<TemplateProps> = ({ data }) => {
                   Name
                 </td>
                 <td className="p-2 border" style={{ borderColor: colors.secondary }}>
-                  {personalInfo.fullName || 'Your Name'}
+                  {personalInfo.fullName}
                 </td>
                 {personalInfo.profileImage && (
                   <td className="border p-2" rowSpan={6} style={{ width: '120px', borderColor: colors.secondary }}>

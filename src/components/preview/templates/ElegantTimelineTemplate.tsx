@@ -55,13 +55,13 @@ export const ElegantTimelineTemplate: React.FC<TemplateProps> = ({ data }) => {
           className="text-3xl font-light mb-2"
           style={{ color: colors.primary }}
         >
-          {personalInfo.fullName || 'Your Name'}
+          {personalInfo.fullName}
         </h1>
         <h2 
           className="text-lg font-normal mb-3"
           style={{ color: colors.secondary }}
         >
-          {personalInfo.jobTitle || 'Your Job Title'}
+          {personalInfo.jobTitle}
         </h2>
         
         <div className="flex justify-center flex-wrap gap-x-4 gap-y-1 text-xs">

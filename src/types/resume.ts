@@ -123,6 +123,36 @@ export interface TemplateConfig {
   features: string[];
 }
 
+
+export function normalizeSkillLabels(values: unknown[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  const add = (value: unknown) => {
+    if (typeof value !== 'string') return;
+    let text = value.replace(/[•·|]+/g, ',').replace(/\s*,\s*/g, ',').trim();
+    if (!text) return;
+
+    // Split common AI/JD extraction artifacts such as
+    // "Predictive ModelingData TransformationJavaSystem Design".
+    text = text
+      .replace(/(?<=[a-z])(?=[A-Z])/g, ',')
+      .replace(/(?<=[0-9])(?=[A-Za-z])/g, ',')
+      .replace(/\s{2,}/g, ' ');
+
+    for (const part of text.split(',').map(x => x.trim()).filter(Boolean)) {
+      const key = part.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(part);
+      }
+    }
+  };
+
+  values.forEach(add);
+  return out;
+}
+
 export const DEFAULT_COLORS: ResumeColors = {
   primary: '#3b82f6',
   secondary: '#6b7280',
