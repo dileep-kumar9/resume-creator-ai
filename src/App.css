@@ -1,0 +1,102 @@
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Keep the editor usable when the browser is narrowed to a ChatGPT-like
+   half-window. The editor becomes a single scrollable workspace instead of
+   forcing a 1500px-wide desktop canvas into a narrow viewport. */
+.resume-maker-shell {
+  width: 100%;
+  min-width: 0;
+}
+
+.resume-maker-container {
+  width: 100%;
+  min-width: 0;
+}
+
+.resume-workspace {
+  width: 100%;
+  min-width: 0;
+}
+
+.resume-editor-panel,
+.resume-preview-panel {
+  min-width: 0;
+}
+
+.resume-panel-tabs {
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.resume-panel-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 1279px) {
+  .resume-maker-container {
+    max-width: 100%;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .resume-workspace {
+    gap: 12px;
+  }
+
+  .resume-editor-panel,
+  .resume-preview-panel {
+    height: calc(100vh - 150px);
+    max-height: 850px;
+  }
+}
+
+@media (max-width: 767px) {
+  .resume-maker-container {
+    padding: 10px;
+  }
+
+  .resume-editor-panel,
+  .resume-preview-panel {
+    height: calc(100vh - 125px);
+    border-radius: 10px;
+  }
+}
+
+/* Created resume is a ChatGPT-style right artifact sidebar: it overlays the
+   chat workspace and can be opened/closed without changing the chat or resume state. */
+.resume-artifact-sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(560px, 44vw);
+  min-width: 390px;
+  animation: resumeSidebarIn .18s ease-out;
+}
+.resume-artifact-paper {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.12);
+  padding: 16px;
+  min-height: 100%;
+  overflow: auto;
+}
+.resume-artifact-paper #resume-content {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  transform: none !important;
+}
+@keyframes resumeSidebarIn {
+  from { transform: translateX(18px); opacity: .72; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@media (max-width: 900px) {
+  .resume-artifact-sidebar {
+    width: min(94vw, 560px);
+    min-width: 0;
+  }
+}
