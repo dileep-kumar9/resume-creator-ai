@@ -1,9 +1,10 @@
 {
-  "version": 2,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
     "api/[...path].mjs": {
+      "runtime": "nodejs24.x",
       "maxDuration": 60
     }
   },

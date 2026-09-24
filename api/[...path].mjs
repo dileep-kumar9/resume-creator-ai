@@ -1,4 +1,4 @@
-import { handleParseResume, handleTailor, handleAgent } from '../server.mjs';
+import { handleParseResume, handleTailor, handleAgent } from '../local-server.mjs';
 
 export default async function handler(req, res) {
   const route = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`).pathname;
