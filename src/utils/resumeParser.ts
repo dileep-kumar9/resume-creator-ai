@@ -58,7 +58,7 @@ function blankResume(): ResumeData {
 
 export function normalizeParsedResume(parsed: ParsedResumePayload, base?: ResumeData): ResumeData {
   const fallback = base ? structuredClone(base) : blankResume();
-  const p = parsed.personalInfo || {};
+  const p: Partial<ResumeData['personalInfo']> = parsed.personalInfo || {};
   fallback.personalInfo = { ...fallback.personalInfo, ...p, website: normalizeUrl(p.website), linkedin: normalizeUrl(p.linkedin), github: normalizeUrl(p.github) };
   fallback.summary = typeof parsed.summary === 'string' ? parsed.summary : fallback.summary;
   fallback.experience = Array.isArray(parsed.experience) ? parsed.experience.map((x: any) => ({

@@ -29,7 +29,7 @@ export async function importResumeFromFile(file: File, useAI = true): Promise<Re
     const chunk = 0x8000;
     for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
     const data = await parseResumeWithAI({ pdfBase64: btoa(binary) });
-    return { ...data, template: 'original-upload', originalTemplate: { sourceFileName: file.name, sourceFormat: 'pdf', importedAt: new Date().toISOString(), sourceDataUrl: `data:application/pdf;base64,${btoa(binary)}` } };
+    return { ...data, template: 'original-upload', originalTemplate: { sourceFileName: file.name, sourceFormat: 'pdf', importedAt: new Date().toISOString(), sourceDataUrl: `data:application/pdf;base64,${btoa(binary)}`, editableTemplate: 'modern-minimal' } };
   }
   const text = await extractResumeText(file);
   if (!text.trim()) throw new Error('No readable text was found in this resume. Scanned/image-only PDFs need OCR before import.');
@@ -39,7 +39,7 @@ export async function importResumeFromFile(file: File, useAI = true): Promise<Re
   let binary = '';
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  return { ...data, template: 'original-upload', originalTemplate: { sourceFileName: file.name, sourceFormat: ext, importedAt: new Date().toISOString(), sourceDataUrl: `data:${mime};base64,${btoa(binary)}` } };
+  return { ...data, template: 'original-upload', originalTemplate: { sourceFileName: file.name, sourceFormat: ext, importedAt: new Date().toISOString(), sourceDataUrl: `data:${mime};base64,${btoa(binary)}`, editableTemplate: 'modern-minimal' } };
 }
 
 export const importResumeFromJSON = (file: File) => importResumeFromFile(file, false);

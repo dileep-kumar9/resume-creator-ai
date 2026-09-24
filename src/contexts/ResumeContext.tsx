@@ -113,11 +113,21 @@ function resumeReducer(state: ResumeState, action: ResumeAction): ResumeState {
         ...state,
         resumeData: { ...state.resumeData, colors: action.payload }
       };
-    case 'UPDATE_TEMPLATE':
+    case 'UPDATE_TEMPLATE': {
+      const original = state.resumeData.originalTemplate;
+      const nextOriginal = original
+        ? {
+            ...original,
+            ...(action.payload === 'original-upload'
+              ? {}
+              : { editableTemplate: action.payload as Exclude<ResumeData['template'], 'original-upload'> })
+          }
+        : original;
       return {
         ...state,
-        resumeData: { ...state.resumeData, template: action.payload }
+        resumeData: { ...state.resumeData, template: action.payload, originalTemplate: nextOriginal }
       };
+    }
     case 'UPDATE_PAGE_FORMAT':
       return {
         ...state,

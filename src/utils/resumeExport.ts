@@ -8,6 +8,8 @@ const downloadBlob = (blob: Blob, filename: string) => {
 };
 
 export async function exportResumeToPDF(element: HTMLElement, data: ResumeData) {
+  // Original is a preserved reference. Once tailored, the live artifact renders the editable layout.
+  // Exporting that live artifact keeps the tailored content rather than downloading the original PDF.
   // html2pdf keeps the exact live template DOM/CSS, unlike rebuilding the resume in a second renderer.
   const html2pdf = (await import('html2pdf.js')).default;
   const clone = element.cloneNode(true) as HTMLElement;
@@ -80,5 +82,5 @@ export async function exportResumeToDOCX(data: ResumeData) {
     styles: { paragraphStyles: [{ id: 'ResumeHeading', name: 'Resume Heading', basedOn: 'Normal', next: 'Normal', run: { font, bold: true, color: primary, size: 22 }, paragraph: { spacing: { before: 220, after: 100 } } }] },
     sections: [{ properties: { page: { size: data.pageFormat === 'a4' ? { width: 11906, height: 16838 } : { width: 12240, height: 15840 }, margin: { top: 850, right: 850, bottom: 850, left: 850 } } }, children: sectionChildren }]
   });
-  const blob = await Packer.toBlob(doc); downloadBlob(blob, `${safeName(p.fullName || 'resume')}-${data.template}.docx`);
+  const blob = await Packer.toBlob(doc); downloadBlob(blob, `${safeName(p.fullName || 'resume')}-${data.template === 'original-upload' ? (data.originalTemplate?.editableTemplate || 'tailored') : data.template}.docx`);
 }

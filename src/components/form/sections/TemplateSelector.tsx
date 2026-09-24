@@ -34,6 +34,12 @@ export const TemplateSelector: React.FC = () => {
                   {selectedTemplate === 'original-upload' && <Check className="w-5 h-5 text-primary" />}
                 </div>
                 <Badge variant="outline" className="text-xs">Imported {state.resumeData.originalTemplate.sourceFormat.toUpperCase()}</Badge>
+                {state.resumeData.originalTemplate.tailored && (
+                  <div className="rounded-md bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-muted-foreground">
+                    Original remains selected as your reference. Your tailored content is rendered in the editable layout
+                    <strong className="text-foreground"> {state.resumeData.originalTemplate.editableTemplate || 'modern-minimal'}</strong>.
+                  </div>
+                )}
                 <Button
                   variant={selectedTemplate === 'original-upload' ? 'default' : 'outline'}
                   size="sm"

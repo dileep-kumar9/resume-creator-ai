@@ -107,3 +107,46 @@
     min-width: 0;
   }
 }
+
+
+/* Resume Studio sidebar and Created Resume artifact polish */
+.resume-studio-sidebar {
+  width: 320px;
+  background: hsl(var(--card));
+}
+.resume-studio-nav button {
+  min-height: 42px;
+}
+.resume-artifact-sidebar {
+  width: min(720px, 48vw) !important;
+  min-width: 560px !important;
+  background: hsl(var(--background));
+  border-left: 1px solid hsl(var(--border));
+}
+.resume-artifact-paper {
+  padding: 18px;
+  background: hsl(var(--muted) / .35);
+  min-height: 100%;
+}
+.resume-artifact-paper > div {
+  margin: 0 auto;
+  max-width: 100%;
+}
+.resume-artifact-paper #resume-content {
+  border-radius: 4px;
+}
+@media (max-width: 1100px) {
+  .resume-artifact-sidebar {
+    width: min(680px, 62vw) !important;
+    min-width: 460px !important;
+  }
+}
+@media (max-width: 800px) {
+  .resume-artifact-sidebar {
+    width: 100vw !important;
+    min-width: 0 !important;
+  }
+  .resume-studio-sidebar {
+    width: 300px;
+  }
+}

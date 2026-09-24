@@ -104,6 +104,10 @@ export interface OriginalTemplateInfo {
   importedAt: string;
   /** Data URL of the original uploaded PDF/DOCX for reference/export. Not used by AI tailoring. */
   sourceDataUrl?: string;
+  /** True after AI/local edits are applied while the uploaded document remains the selected reference template. */
+  tailored?: boolean;
+  /** Built-in editable layout used to render tailored content while Original remains selected. */
+  editableTemplate?: Exclude<TemplateType, 'original-upload'>;
 }
 
 export type TemplateType = 'original-upload' | 'tech-sidebar' | 'business-professional' | 'modern-minimal' | 'elegant-timeline' | 'creative-modern' | 'bjet-professional';

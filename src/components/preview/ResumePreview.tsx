@@ -11,7 +11,11 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   const { state } = useResume();
   const { resumeData } = state;
 
-  if (resumeData.template === 'original-upload' && resumeData.originalTemplate?.sourceDataUrl) {
+  const visualTemplate = resumeData.template === 'original-upload' && resumeData.originalTemplate?.tailored
+    ? (resumeData.originalTemplate.editableTemplate || 'modern-minimal')
+    : resumeData.template;
+
+  if (visualTemplate === 'original-upload' && resumeData.originalTemplate?.sourceDataUrl) {
     return (
       <div className="w-full h-full flex items-center justify-center p-2">
         <div id="resume-content" className="w-full h-full bg-white shadow-xl overflow-hidden">
@@ -33,7 +37,7 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   }
 
   const renderTemplate = () => {
-    switch (resumeData.template) {
+    switch (visualTemplate) {
       case 'tech-sidebar':
         return <TechSidebarTemplate data={resumeData} />;
       case 'business-professional':

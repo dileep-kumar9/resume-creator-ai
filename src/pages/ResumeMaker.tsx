@@ -55,7 +55,16 @@ const AgentWorkspace:React.FC=()=>{
     }catch(e){setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:e instanceof Error?e.message:'Unable to complete request.'}]);}finally{setLoading(false);}
   };
   const undo=()=>{const prev=history.at(-1);if(!prev)return;importResumeData(prev);setHistory(h=>h.slice(0,-1));};
-  const pdf=async()=>{const el=document.getElementById('resume-content');if(el)await exportResumeToPDF(el,state.resumeData);};
+  const pdf=async()=>{
+    const el=document.getElementById('resume-content');
+    if(!el){
+      toast({title:'Open resume preview first',description:'Open the Created Resume panel and switch to Preview before exporting the PDF.',variant:'destructive'});
+      setResumeOpen(true);
+      setResumeEditMode(false);
+      return;
+    }
+    await exportResumeToPDF(el,state.resumeData);
+  };
   const docx=()=>exportResumeToDOCX(state.resumeData);
   const panelMap:any={content:'form',customize:'customize',settings:'settings',templates:'templates'};
   return <div className="h-screen w-full bg-background flex overflow-hidden">
@@ -95,8 +104,13 @@ const AgentWorkspace:React.FC=()=>{
         </div>
       </div>
       {resumeOpen&&<aside className="resume-artifact-sidebar w-[min(560px,42vw)] min-w-[380px] shrink-0 border-l bg-card flex flex-col shadow-xl z-20">
-        <div className="h-14 px-3 border-b flex items-center justify-between">
-          <div className="flex items-center gap-2"><FileText className="w-4 h-4"/><span className="font-semibold">Created resume</span></div>
+        <div className="h-14 px-4 border-b flex items-center justify-between bg-card/95 sticky top-0 z-10">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2"><FileText className="w-4 h-4 shrink-0"/><span className="font-semibold truncate">Created resume</span></div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              {state.resumeData.template === 'original-upload' ? 'Original reference selected' : 'Editable template selected'}
+            </div>
+          </div>
           <div className="flex items-center gap-1">
             <Button size="sm" variant={resumeEditMode?'secondary':'ghost'} onClick={()=>setResumeEditMode(v=>!v)}>{resumeEditMode?'Preview':'Edit'}</Button>
             <Button size="icon" variant="ghost" title="Collapse resume" onClick={()=>setResumeOpen(false)}><ChevronLeft className="w-4 h-4"/></Button>
