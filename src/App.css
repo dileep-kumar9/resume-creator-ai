@@ -704,20 +704,6 @@ html, body, #root {
 .resume-studio-panel .p-6 {
   padding: 14px !important;
 }
-.resume-studio-panel [role="tablist"] {
-  width: 100%;
-  min-width: 0;
-  display: grid !important;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-}
-.resume-studio-panel [role="tab"] {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding-left: 6px !important;
-  padding-right: 6px !important;
-}
 
 /* GPT-like draggable divider for the Created Resume artifact. */
 .resume-artifact-resize-handle {
@@ -762,3 +748,67 @@ html, body, #root {
     grid-template-columns: 280px minmax(0, 1fr);
   }
 }
+
+
+/* FINAL SIDEBAR POLISH */
+.resume-studio-panel { overflow: hidden; }
+.resume-form-root { min-width: 0; min-height: 0; }
+
+.resume-form-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  min-height: 42px;
+  padding: 4px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--muted) / .65);
+  box-shadow: 0 4px 14px rgb(0 0 0 / .08);
+}
+.resume-form-tab {
+  min-width: 0 !important;
+  width: 100%;
+  height: 32px;
+  padding: 0 7px !important;
+  border-radius: 7px !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px !important;
+  line-height: 1;
+}
+.resume-form-scroll,
+.resume-form-panel-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / .28) transparent;
+}
+.resume-form-scroll::-webkit-scrollbar,
+.resume-form-panel-scroll::-webkit-scrollbar { width: 6px; }
+.resume-form-scroll::-webkit-scrollbar-thumb,
+.resume-form-panel-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: hsl(var(--muted-foreground) / .25);
+}
+.resume-studio-panel .resume-form-root .p-6 { padding: 12px !important; }
+.resume-studio-panel .resume-form-root [data-slot="card-header"] { padding: 12px 12px 8px !important; }
+.resume-studio-panel .resume-form-root [data-slot="card-content"] { padding: 8px 12px 12px !important; }
+.resume-studio-panel .resume-form-root .space-y-6 { row-gap: 14px !important; }
+.resume-studio-panel .resume-form-root input,
+.resume-studio-panel .resume-form-root textarea,
+.resume-studio-panel .resume-form-root select { min-height: 38px; }
+
+.resume-artifact-resize-handle {
+  left: -8px;
+  width: 16px;
+  touch-action: none;
+  cursor: col-resize;
+  z-index: 100;
+}
+.resume-artifact-resize-handle::before { inset: 0 5px; }
+.resume-artifact-resize-handle span {
+  width: 4px;
+  height: 54px;
+  opacity: .28;
+}
+.resume-artifact-resize-handle:hover span,
+.resume-artifact-resize-handle:active span { opacity: 1; }

@@ -36,8 +36,11 @@ Rules:
 - Preserve EVERY experience entry and EVERY bullet/point as a separate bullet string.
 - Preserve EVERY project, its complete description, each project bullet/point, technologies, and URLs. If a project has multiple lines, keep them in description or bulletPoints without dropping content.
 - Preserve all education, certifications, skills, contact information, dates, employers, titles, locations and links.
-- If a field is absent, use an empty string or empty array.
-- Never turn missing information into a guess.
+- If a field is absent, use an empty string or empty array. NEVER write "Not specified", "N/A", "Unknown", or a made-up value for a missing field.
+- If the source shows only a year (for example "2024"), preserve exactly "2024"; do not convert it to January or another month.
+- Project dates are optional. If a project has no visible date, leave startDate and endDate empty.
+- Never infer dates, locations, grades, technologies, metrics, or responsibilities from context.
+- If visually separated skill tags appear adjacent in extracted text, keep each visible tag as a separate array item.
 - Use the JSON schema exactly.
 
 Resume text/content follows:\n${text}`; }

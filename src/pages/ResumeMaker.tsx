@@ -26,6 +26,7 @@ const AgentWorkspace:React.FC=()=>{
   const [prompt,setPrompt]=useState('');
   const [loading,setLoading]=useState(false);
   const [attachment,setAttachment]=useState<File|null>(null);
+  const [attachmentKind,setAttachmentKind]=useState<'resume'|'reference'|null>(null);
   const [attachmentText,setAttachmentText]=useState('');
   const [attachmentPdf,setAttachmentPdf]=useState('');
   const [history,setHistory]=useState<ResumeData[]>([]);
@@ -33,8 +34,17 @@ const AgentWorkspace:React.FC=()=>{
   const fileRef=useRef<HTMLInputElement>(null);
   const importRef=useRef<HTMLInputElement>(null);
 
-  const readAttachment=async(file:File)=>{
-    setAttachment(file); setAttachmentText(''); setAttachmentPdf('');
+  const clearAttachment=()=>{
+    setAttachment(null);
+    setAttachmentKind(null);
+    setAttachmentText('');
+    setAttachmentPdf('');
+  };
+
+  // Uploading a file only attaches it to the composer. It must never change the
+  // resume, template, or artifact until the user explicitly presses Send.
+  const readAttachment=async(file:File, kind:'resume'|'reference'='reference')=>{
+    setAttachment(file); setAttachmentKind(kind); setAttachmentText(''); setAttachmentPdf('');
     try{
       const text=await extractResumeText(file); setAttachmentText(text.slice(0,120000));
       if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf')){
@@ -42,35 +52,46 @@ const AgentWorkspace:React.FC=()=>{
         for(let i=0;i<bytes.length;i+=0x8000) binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
         setAttachmentPdf(btoa(binary));
       }
-    }catch(e){toast({title:'Attachment error',description:e instanceof Error?e.message:'Could not read file.',variant:'destructive'});}
-  };
-
-  const importResume=async(file?:File)=>{
-    if(!file)return;
-    try{
-      const data=await importResumeFromFile(file,!file.name.toLowerCase().endsWith('.json'));
-      importResumeData(data);
-      setResumeOpen(true);
-      setResumeEditMode(false);
-      setMessages(m=>[...m,
-        {id:crypto.randomUUID(),role:'user',text:'Use this as my resume.',attachment:file.name},
-        {id:crypto.randomUUID(),role:'assistant',text:'Resume loaded. Tell me what you want to change or paste a job description.',hasResume:true}
-      ]);
     }catch(e){
-      toast({title:'Import failed',description:e instanceof Error?e.message:'Could not parse resume.',variant:'destructive'});
+      clearAttachment();
+      toast({title:'Attachment error',description:e instanceof Error?e.message:'Could not read file.',variant:'destructive'});
     }
   };
 
   const send=async()=>{
-    if(!prompt.trim()||loading)return;
-    const instruction=prompt.trim(); const att=attachment?.name;
+    const hasAttachment=Boolean(attachment);
+    if((!prompt.trim()&&!hasAttachment)||loading)return;
+
+    const instruction=prompt.trim() || (attachmentKind==='resume' ? 'Use this uploaded file as my resume.' : 'Analyze the attached reference document and help me improve my resume.');
+    const att=attachment?.name;
     setMessages(m=>[...m,{id:crypto.randomUUID(),role:'user',text:instruction,attachment:att}]);
     setPrompt(''); setLoading(true);
+
     try{
+      // A resume upload is parsed only after Send. This prevents sidebar/tab
+      // changes and file selection from mutating the live resume automatically.
+      let workingResume=state.resumeData;
+      if(attachment && attachmentKind==='resume'){
+        workingResume=await importResumeFromFile(attachment,!attachment.name.toLowerCase().endsWith('.json'));
+        importResumeData(workingResume);
+        setResumeOpen(true);
+        setResumeEditMode(false);
+
+        // If the user only uploaded a resume and did not ask for an AI change,
+        // stop here. The explicit Send action is the import/parse confirmation.
+        if(!prompt.trim()){
+          setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:'Resume loaded. Your uploaded content is now in the editor. Tell me what you want to change or paste a job description.',hasResume:true}]);
+          clearAttachment();
+          return;
+        }
+      }
+
+      const referenceTextForAgent=attachmentKind==='reference' ? attachmentText : '';
+      const referencePdfForAgent=attachmentKind==='reference' ? attachmentPdf : '';
       const r=await fetch('/api/agent',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({resumeData:state.resumeData,instruction,referenceText:attachmentText,referencePdfBase64:attachmentPdf})
+        body:JSON.stringify({resumeData:workingResume,instruction,referenceText:referenceTextForAgent,referencePdfBase64:referencePdfForAgent})
       });
       const result=await r.json().catch(()=>({}));
       if(!r.ok){
@@ -80,28 +101,26 @@ const AgentWorkspace:React.FC=()=>{
         throw new Error(message);
       }
       if(!result.resumeData)throw new Error('Agent returned no resume.');
-      setHistory(h=>[...h,structuredClone(state.resumeData)]);
-      // Normalize the provider response against the current resume so partial or
-      // oddly-shaped AI output can never replace real candidate data with blanks.
-      const next = normalizeParsedResume(result.resumeData as ResumeData, state.resumeData);
 
-      // AI tailoring changes content, never the user's template choice.
-      // If the original uploaded PDF is selected, keep it selected as the
-      // reference, but render the tailored content through its editable layout.
-      next.template = state.resumeData.template;
-      if (state.resumeData.originalTemplate) {
+      setHistory(h=>[...h,structuredClone(workingResume)]);
+      const next = normalizeParsedResume(result.resumeData as ResumeData, workingResume);
+
+      // The AI agent is never allowed to choose a template. The template used
+      // for this request is the user's current selection and remains unchanged.
+      next.template = workingResume.template;
+      if (workingResume.originalTemplate) {
         next.originalTemplate = {
-          ...state.resumeData.originalTemplate,
+          ...workingResume.originalTemplate,
           tailored: true,
           editableTemplate:
-            state.resumeData.originalTemplate.editableTemplate || 'modern-minimal'
+            workingResume.originalTemplate.editableTemplate || 'modern-minimal'
         };
       }
       importResumeData(next);
       setResumeOpen(true);
       setResumeEditMode(false);
       setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:result.message||'Resume updated.',changes:result.changes,analysis:result.analysis,hasResume:true}]);
-      setAttachment(null); setAttachmentText(''); setAttachmentPdf('');
+      clearAttachment();
     }catch(e){
       setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:e instanceof Error?e.message:'Unable to complete request.'}]);
     }finally{setLoading(false);}
@@ -127,26 +146,31 @@ const AgentWorkspace:React.FC=()=>{
 
   const docx=()=>exportResumeToDOCX(state.resumeData);
   const panelMap:any={content:'form',customize:'customize',settings:'settings',templates:'templates'};
-  const startArtifactResize=(e:React.PointerEvent)=>{
+  const resizeState=useRef<{startX:number;startWidth:number;pointerId:number}|null>(null);
+  const startArtifactResize=(e:React.PointerEvent<HTMLDivElement>)=>{
     if(!resumeOpen)return;
     e.preventDefault();
-    const startX=e.clientX;
-    const startWidth=artifactWidth;
-    const onMove=(ev:PointerEvent)=>{
-      const next=startWidth-(ev.clientX-startX);
-      const max=Math.min(760, Math.max(480, window.innerWidth-420));
-      setArtifactWidth(Math.max(420, Math.min(max,next)));
-    };
-    const onUp=()=>{
-      document.removeEventListener('pointermove',onMove);
-      document.removeEventListener('pointerup',onUp);
-      document.body.style.cursor='';
-      document.body.style.userSelect='';
-    };
+    e.stopPropagation();
+    resizeState.current={startX:e.clientX,startWidth:artifactWidth,pointerId:e.pointerId};
+    try{e.currentTarget.setPointerCapture(e.pointerId);}catch{}
     document.body.style.cursor='col-resize';
     document.body.style.userSelect='none';
-    document.addEventListener('pointermove',onMove);
-    document.addEventListener('pointerup',onUp);
+  };
+  const moveArtifactResize=(e:React.PointerEvent<HTMLDivElement>)=>{
+    const s=resizeState.current;
+    if(!s)return;
+    e.preventDefault();
+    const next=s.startWidth-(e.clientX-s.startX);
+    const min=420;
+    const max=Math.max(min,Math.min(900,window.innerWidth-360));
+    setArtifactWidth(Math.max(min,Math.min(max,next)));
+  };
+  const endArtifactResize=(e?:React.PointerEvent<HTMLDivElement>)=>{
+    if(!resizeState.current)return;
+    if(e)try{e.currentTarget.releasePointerCapture(e.pointerId);}catch{}
+    resizeState.current=null;
+    document.body.style.cursor='';
+    document.body.style.userSelect='';
   };
 
   const navItems:[
@@ -242,10 +266,10 @@ const AgentWorkspace:React.FC=()=>{
               />
               <div className="resume-chat-composer-actions">
                 <div className="flex gap-1 items-center">
-                  <Button size="icon" variant="ghost" onClick={()=>fileRef.current?.click()} title="Attach reference resume or document" aria-label="Attach reference"><Paperclip className="w-4 h-4"/></Button>
+                  <Button size="icon" variant="ghost" onClick={()=>fileRef.current?.click()} title="Attach reference document" aria-label="Attach reference"><Paperclip className="w-4 h-4"/></Button>
                   <Button size="sm" variant="ghost" onClick={()=>importRef.current?.click()}>Upload resume</Button>
                 </div>
-                <Button size="icon" className="rounded-full resume-send-button" disabled={!prompt.trim()||loading} onClick={send} title="Send" aria-label="Send message">
+                <Button size="icon" className="rounded-full resume-send-button" disabled={(!prompt.trim()&&!attachment)||loading} onClick={send} title="Send" aria-label="Send message">
                   {loading?<Loader2 className="w-4 h-4 animate-spin"/>:<Send className="w-4 h-4"/>}
                 </Button>
               </div>
@@ -254,7 +278,7 @@ const AgentWorkspace:React.FC=()=>{
         </section>
 
         {resumeOpen&&<aside className="resume-artifact-panel" style={{width:artifactWidth,flexBasis:artifactWidth}} aria-label="Created resume artifact">
-          <div className="resume-artifact-resize-handle" onPointerDown={startArtifactResize} title="Drag to resize created resume">
+          <div className="resume-artifact-resize-handle" onPointerDown={startArtifactResize} onPointerMove={moveArtifactResize} onPointerUp={endArtifactResize} onPointerCancel={endArtifactResize} title="Drag to resize created resume" role="separator" aria-orientation="vertical" aria-label="Resize created resume">
             <span />
           </div>
           <div className="resume-artifact-header">
@@ -262,8 +286,8 @@ const AgentWorkspace:React.FC=()=>{
               <div className="flex items-center gap-2"><FileText className="w-4 h-4 shrink-0"/><span className="font-semibold truncate">Created resume</span></div>
               <div className="text-[11px] text-muted-foreground mt-0.5">
                 {state.resumeData.template==='original-upload'
-                  ? 'Original uploaded template selected · tailored content rendered in editable layout'
-                  : 'Editable template selected'}
+                  ? `Original uploaded file preserved · tailored content uses ${state.resumeData.originalTemplate?.editableTemplate || 'modern-minimal'} layout`
+                  : 'Editable template selected by you'}
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -307,8 +331,8 @@ const AgentWorkspace:React.FC=()=>{
         </aside>}
       </div>
 
-      <input ref={fileRef} className="hidden" type="file" accept=".pdf,.docx,.txt" onChange={e=>{const f=e.target.files?.[0];if(f)readAttachment(f);e.currentTarget.value='';}}/>
-      <input ref={importRef} className="hidden" type="file" accept=".pdf,.docx,.txt,.json" onChange={e=>{importResume(e.target.files?.[0]);e.currentTarget.value='';}}/>
+      <input ref={fileRef} className="hidden" type="file" accept=".pdf,.docx,.txt" onChange={e=>{const f=e.target.files?.[0];if(f)readAttachment(f,'reference');e.currentTarget.value='';}}/>
+      <input ref={importRef} className="hidden" type="file" accept=".pdf,.docx,.txt,.json" onChange={e=>{const f=e.target.files?.[0];if(f)readAttachment(f,'resume');e.currentTarget.value='';}}/>
     </main>
   </div>;
 };

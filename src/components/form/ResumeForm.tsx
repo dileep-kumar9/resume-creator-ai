@@ -9,7 +9,6 @@ import { CustomSectionsForm } from './sections/CustomSectionsForm';
 import { TemplateSelector } from './sections/TemplateSelector';
 import { ColorCustomizer } from './sections/ColorCustomizer';
 import { SectionManager } from './sections/SectionManager';
-import { ScrollArea } from '../ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { AITailorPanel } from './AITailorPanel';
 
@@ -24,41 +23,39 @@ export const ResumeForm: React.FC<ResumeFormProps> = ({ activePanel }) => {
     switch (activePanel) {
       case 'form':
         return (
-          <div className="p-6 h-full">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 mb-4">
-                <TabsTrigger value="personal" className="text-xs px-2 py-2">Personal</TabsTrigger>
-                <TabsTrigger value="experience" className="text-xs px-1 py-2">Work & Projects</TabsTrigger>
-                <TabsTrigger value="education" className="text-xs px-1 py-2">Education & Skills</TabsTrigger>
-                <TabsTrigger value="custom" className="text-xs px-2 py-2">Custom</TabsTrigger>
+          <div className="resume-form-root p-3 h-full min-h-0">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full min-h-0 flex flex-col">
+              <TabsList className="resume-form-tabs grid w-full grid-cols-4 gap-1 mb-3 shrink-0" aria-label="Resume sections">
+                <TabsTrigger value="personal" className="resume-form-tab">Personal</TabsTrigger>
+                <TabsTrigger value="experience" className="resume-form-tab" title="Work & Projects">Work</TabsTrigger>
+                <TabsTrigger value="education" className="resume-form-tab" title="Education & Skills">Education</TabsTrigger>
+                <TabsTrigger value="custom" className="resume-form-tab">Custom</TabsTrigger>
               </TabsList>
-              
-              <div className="flex-1 overflow-hidden">
-                <ScrollArea className="h-full">
-                  <TabsContent value="personal" className="space-y-6 mt-0">
-                    <PersonalInfoForm />
-                    <SummaryForm />
-                  </TabsContent>
-                  
-                  <TabsContent value="experience" className="space-y-6 mt-0">
-                    <ExperienceForm />
-                    <ProjectsForm />
-                  </TabsContent>
-                  
-                  <TabsContent value="education" className="space-y-6 mt-0">
-                    <EducationForm />
-                    <SkillsForm />
-                  </TabsContent>
-                  
-                  <TabsContent value="custom" className="space-y-6 mt-0">
-                    <CustomSectionsForm />
-                  </TabsContent>
-                </ScrollArea>
+
+              <div className="resume-form-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+                <TabsContent value="personal" className="space-y-4 mt-0">
+                  <PersonalInfoForm />
+                  <SummaryForm />
+                </TabsContent>
+
+                <TabsContent value="experience" className="space-y-4 mt-0">
+                  <ExperienceForm />
+                  <ProjectsForm />
+                </TabsContent>
+
+                <TabsContent value="education" className="space-y-4 mt-0">
+                  <EducationForm />
+                  <SkillsForm />
+                </TabsContent>
+
+                <TabsContent value="custom" className="space-y-4 mt-0">
+                  <CustomSectionsForm />
+                </TabsContent>
               </div>
             </Tabs>
           </div>
         );
-      
+
       case 'templates':
         return <div className="space-y-8 p-6"><TemplateSelector /></div>;
       case 'customize':
@@ -79,8 +76,10 @@ export const ResumeForm: React.FC<ResumeFormProps> = ({ activePanel }) => {
   };
 
   return (
-    <ScrollArea className="h-full">
-      {renderPanel()}
-    </ScrollArea>
+    <div className="resume-form-root h-full min-h-0">
+      {activePanel === 'form'
+        ? renderPanel()
+        : <div className="resume-form-panel-scroll h-full overflow-y-auto overflow-x-hidden">{renderPanel()}</div>}
+    </div>
   );
 };

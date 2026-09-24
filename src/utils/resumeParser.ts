@@ -59,21 +59,32 @@ function blankResume(): ResumeData {
 export function normalizeParsedResume(parsed: ParsedResumePayload, base?: ResumeData): ResumeData {
   const fallback = base ? structuredClone(base) : blankResume();
   const p: Partial<ResumeData['personalInfo']> = parsed.personalInfo || {};
-  fallback.personalInfo = { ...fallback.personalInfo, ...p, website: normalizeUrl(p.website), linkedin: normalizeUrl(p.linkedin), github: normalizeUrl(p.github) };
+  fallback.personalInfo = {
+    ...fallback.personalInfo,
+    ...p,
+    fullName: cleanMissingValue(p.fullName),
+    jobTitle: cleanMissingValue(p.jobTitle),
+    email: cleanMissingValue(p.email),
+    phone: cleanMissingValue(p.phone),
+    location: cleanMissingValue(p.location),
+    website: normalizeUrl(cleanMissingValue(p.website)),
+    linkedin: normalizeUrl(cleanMissingValue(p.linkedin)),
+    github: normalizeUrl(cleanMissingValue(p.github))
+  };
   fallback.summary = typeof parsed.summary === 'string' ? parsed.summary : fallback.summary;
   fallback.experience = Array.isArray(parsed.experience) ? parsed.experience.map((x: any) => ({
-    id: x.id || uid('exp'), jobTitle: x.jobTitle || '', company: x.company || '', location: x.location || '',
-    startDate: x.startDate || '', endDate: x.endDate || '', current: Boolean(x.current), description: x.description || '',
-    bulletPoints: Array.isArray(x.bulletPoints) ? x.bulletPoints.filter(Boolean) : []
+    id: x.id || uid('exp'), jobTitle: cleanMissingValue(x.jobTitle), company: cleanMissingValue(x.company), location: cleanMissingValue(x.location),
+    startDate: cleanResumeDate(x.startDate), endDate: cleanResumeDate(x.endDate), current: Boolean(x.current), description: cleanMissingValue(x.description),
+    bulletPoints: Array.isArray(x.bulletPoints) ? x.bulletPoints.filter((v:any)=>typeof v==='string'&&v.trim()).map((v:any)=>v.trim()) : []
   })) : fallback.experience;
   fallback.education = Array.isArray(parsed.education) ? parsed.education.map((x: any) => ({
-    id: x.id || uid('edu'), degree: x.degree || '', institution: x.institution || '', location: x.location || '',
-    graduationYear: x.graduationYear || '', gpa: x.gpa || '', honors: x.honors || ''
+    id: x.id || uid('edu'), degree: cleanMissingValue(x.degree), institution: cleanMissingValue(x.institution), location: cleanMissingValue(x.location),
+    graduationYear: cleanMissingValue(x.graduationYear), gpa: cleanMissingValue(x.gpa), honors: cleanMissingValue(x.honors)
   })) : fallback.education;
   fallback.projects = Array.isArray(parsed.projects) ? parsed.projects.map((x: any) => ({
-    id: x.id || uid('project'), title: x.title || '', description: x.description || '',
-    technologies: Array.isArray(x.technologies) ? x.technologies.filter(Boolean) : [], liveUrl: normalizeUrl(x.liveUrl),
-    githubUrl: normalizeUrl(x.githubUrl), startDate: x.startDate || '', endDate: x.endDate || ''
+    id: x.id || uid('project'), title: cleanMissingValue(x.title), description: cleanMissingValue(x.description),
+    technologies: Array.isArray(x.technologies) ? normalizeSkillLabels(x.technologies) : [], liveUrl: normalizeUrl(cleanMissingValue(x.liveUrl)),
+    githubUrl: normalizeUrl(cleanMissingValue(x.githubUrl)), startDate: cleanResumeDate(x.startDate), endDate: cleanResumeDate(x.endDate)
   })) : fallback.projects;
   if (parsed.skills) {
     fallback.skills = {

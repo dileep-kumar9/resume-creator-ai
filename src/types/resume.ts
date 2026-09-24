@@ -127,18 +127,37 @@ export interface TemplateConfig {
 export function normalizeSkillLabels(values: unknown[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
+  const knownCompound = [
+    'OpenCV','OpenAI','GPT-4','REST APIs','Node.js','Next.js','React.js','TypeScript',
+    'JavaScript','Power BI','SQL Server','Machine Learning','Data Analysis','Data Analytics',
+    'Cloud Infrastructure (AWS)','First-Time-Resolution (FTR) Focus'
+  ];
 
   const add = (value: unknown) => {
     if (typeof value !== 'string') return;
     let text = value.replace(/[•·|]+/g, ',').replace(/\s*,\s*/g, ',').trim();
     if (!text) return;
 
-    // Split common AI/JD extraction artifacts such as
-    // "Predictive ModelingData TransformationJavaSystem Design".
+    // Fix common PDF/AI concatenation without splitting normal technology names
+    // such as OpenCV, GPT-4 API, Node.js or TypeScript.
+    const protectedTokens: string[] = [];
+    knownCompound.forEach((token) => {
+      const marker = `__SKILL_${protectedTokens.length}__`;
+      const re = new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      if (re.test(text)) {
+        text = text.replace(re, marker);
+        protectedTokens.push(token);
+      }
+    });
+
     text = text
-      .replace(/(?<=[a-z])(?=[A-Z])/g, ',')
-      .replace(/(?<=[0-9])(?=[A-Za-z])/g, ',')
+      .replace(/(?<=[a-z])(?=[A-Z][a-z])/g, ',')
+      .replace(/(?<=[a-z])(?=[A-Z]{2,}(?:\s|$))/g, ',')
       .replace(/\s{2,}/g, ' ');
+
+    protectedTokens.forEach((token, i) => {
+      text = text.replace(new RegExp(`__SKILL_${i}__`, 'g'), token);
+    });
 
     for (const part of text.split(',').map(x => x.trim()).filter(Boolean)) {
       const key = part.toLowerCase();
@@ -151,6 +170,29 @@ export function normalizeSkillLabels(values: unknown[]): string[] {
 
   values.forEach(add);
   return out;
+}
+
+export function cleanMissingValue(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const text = value.trim();
+  return /^(not specified|not provided|not available|unknown|n\/a|na|null|undefined)$/i.test(text) ? '' : text;
+}
+
+export function cleanResumeDate(value: unknown): string {
+  const text = cleanMissingValue(value);
+  if (!text) return '';
+  // Preserve year-only dates exactly. The resume extractor must never invent
+  // a month when the source only contains a year.
+  if (/^\d{4}$/.test(text)) return text;
+  // Accept the editor's canonical month format.
+  if (/^\d{4}-\d{2}$/.test(text)) return text;
+  // Convert common month/year strings without accepting arbitrary prose.
+  const match = text.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[ ,.-]+(\d{4})$/i);
+  if (match) {
+    const months: Record<string,string> = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+    return `${match[2]}-${months[match[1].slice(0,3).toLowerCase()]}`;
+  }
+  return '';
 }
 
 export const DEFAULT_COLORS: ResumeColors = {
