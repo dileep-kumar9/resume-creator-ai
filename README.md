@@ -105,3 +105,31 @@ Keep API keys only in `.env`; never put real keys in the source or ZIP.
 - If Gemini is temporarily overloaded (503/429/5xx), the browser extracts PDF text locally and retries through Groq, with Mistral as fallback.
 - Text/DOCX parsing uses Groq -> Mistral fallback when Gemini is unavailable.
 - The editor workspace is responsive below the desktop split breakpoint and remains usable when the browser is narrowed to roughly half-screen width.
+
+## Vercel deployment
+
+This project supports Vercel with the React/Vite frontend and serverless API routes.
+
+### Production
+Deploy the repository to Vercel and add these Environment Variables in the Vercel project settings:
+
+```text
+GEMINI_API_KEY
+GEMINI_PARSER_MODEL
+GROQ_API_KEY
+GROQ_MODEL
+MISTRAL_API_KEY
+MISTRAL_MODEL
+```
+
+The browser calls `/api/agent`, `/api/parse-resume`, and `/api/tailor`. Vercel runs those endpoints as serverless functions, so no separate `localhost:8787` server is needed after deployment.
+
+### Local development
+For local development, continue using:
+
+```bash
+npm run dev
+npm run dev:server
+```
+
+The local Node server remains available for development only.

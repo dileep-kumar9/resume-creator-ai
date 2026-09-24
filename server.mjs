@@ -374,6 +374,21 @@ async function handleAgent(req,res){
 }
 
 async function handleTailor(req,res){try{const b=await readBody(req,4_000_000);if(!b.resumeData||typeof b.resumeData!=='object')return sendJson(res,400,{error:'Resume data is required.'});if(typeof b.jobDescription!=='string'||b.jobDescription.trim().length<40)return sendJson(res,400,{error:'Please provide a complete job description.'});const result=await generateWithFallback([{parts:[{text:tailorPrompt(b.resumeData,b.jobDescription.trim())}]}],tailorSchema,{primary:'groq',timeoutMs:35000});sendJson(res,200,{resumeData:applyTailoring(b.resumeData,result.data),analysis:result.data.analysis,matchedKeywords:result.data.analysis?.matchedKeywords||extractKeywords(b.jobDescription),provider:result.provider,model:result.model});}catch(e){console.error('AI tailor error:',e);sendJson(res,e.status||500,{error:e.message||'Failed to tailor resume.'});}}
+export { handleParseResume, handleTailor, handleAgent };
+
 const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.ico':'image/x-icon'};
 function serveStatic(req,res){let requestPath=decodeURIComponent(new URL(req.url,`http://${req.headers.host}`).pathname);if(requestPath==='/')requestPath='/index.html';const filePath=path.join(distPath,requestPath);if(!filePath.startsWith(distPath)||!fs.existsSync(filePath)||fs.statSync(filePath).isDirectory()){const fallback=path.join(distPath,'index.html');if(fs.existsSync(fallback)){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});return fs.createReadStream(fallback).pipe(res);}return sendJson(res,404,{error:'Build not found. Run npm run build first.'});}res.writeHead(200,{'Content-Type':`${mime[path.extname(filePath)]||'application/octet-stream'}; charset=utf-8`});fs.createReadStream(filePath).pipe(res);}
-http.createServer(async(req,res)=>{try{const route=req.url?.split('?')[0];if(req.method==='POST'&&route==='/api/parse-resume')return handleParseResume(req,res);if(req.method==='POST'&&route==='/api/tailor')return handleTailor(req,res);if(req.method==='POST'&&route==='/api/agent')return handleAgent(req,res);if(req.method==='GET'||req.method==='HEAD')return serveStatic(req,res);sendJson(res,405,{error:'Method not allowed.'});}catch(e){sendJson(res,500,{error:e.message||'Server error.'});}}).listen(port,()=>console.log(`Resume Creator server: http://localhost:${port} | parser=${geminiParserModel} | tailor=${groqModel} | fallback=${mistralModel}`));
+if (process.env.VERCEL !== '1') {
+  http.createServer(async(req,res)=>{
+    try {
+      const route=req.url?.split('?')[0];
+      if(req.method==='POST'&&route==='/api/parse-resume') return handleParseResume(req,res);
+      if(req.method==='POST'&&route==='/api/tailor') return handleTailor(req,res);
+      if(req.method==='POST'&&route==='/api/agent') return handleAgent(req,res);
+      if(req.method==='GET'||req.method==='HEAD') return serveStatic(req,res);
+      sendJson(res,405,{error:'Method not allowed.'});
+    } catch(e) {
+      sendJson(res,500,{error:e.message||'Server error.'});
+    }
+  }).listen(port,()=>console.log(`Resume Creator server: http://localhost:${port} | parser=${geminiParserModel} | tailor=${groqModel} | fallback=${mistralModel}`));
+}
