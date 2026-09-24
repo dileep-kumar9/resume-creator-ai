@@ -669,3 +669,22 @@ html, body, #root {
     width: calc(100% - 24px);
   }
 }
+
+
+/* Final workspace guard: the three panes, not the document, own scrolling. */
+.resume-studio-app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+.resume-studio-app,
+.resume-studio-app * {
+  min-width: 0;
+}
+.resume-studio-main,
+.resume-studio-sidebar,
+.resume-studio-workspace,
+.resume-chat-column,
+.resume-artifact-panel {
+  min-height: 0;
+}
