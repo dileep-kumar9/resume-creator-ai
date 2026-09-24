@@ -61,7 +61,7 @@ export const AITailorPanel: React.FC = () => {
         body: JSON.stringify({ resumeData: state.resumeData, instruction: instruction.trim(), referenceText, referencePdfBase64 })
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || `Resume Agent failed (${response.status})`);
+      if (!response.ok) throw new Error(response.status === 429 ? 'AI providers are temporarily rate-limited. Please wait 30–60 seconds and try again.' : (result.error || `Resume Agent failed (${response.status})`));
       if (!result.resumeData) throw new Error('The Resume Agent returned an invalid resume result.');
       setPreviousResume(structuredClone(state.resumeData));
       const next = result.resumeData as ResumeData;

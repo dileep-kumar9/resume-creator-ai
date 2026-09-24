@@ -7,7 +7,7 @@ import { ElegantTimelineTemplate } from './templates/ElegantTimelineTemplate';
 import { CreativeModernTemplate } from './templates/CreativeModernTemplate';
 import { BJetProfessionalTemplate } from './templates/BJetProfessionalTemplate';
 
-export const ResumePreview: React.FC = () => {
+export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = false }) => {
   const { state } = useResume();
   const { resumeData } = state;
 
@@ -55,8 +55,8 @@ export const ResumePreview: React.FC = () => {
   const isA4 = resumeData.pageFormat === 'a4';
   const pageWidth = isA4 ? 794 : 816; // A4: 210mm = 794px, Letter: 8.5in = 816px
   const pageHeight = isA4 ? 1123 : 1056; // A4: 297mm = 1123px, Letter: 11in = 1056px
-  const containerWidth = 860; // Available width in container (increased more)
-  const containerHeight = 650; // Available height in container
+  const containerWidth = artifact ? 500 : 860;
+  const containerHeight = artifact ? 720 : 650;
   const scaleWidth = containerWidth / pageWidth;
   const scaleHeight = containerHeight / pageHeight;
   const scale = Math.min(scaleWidth, scaleHeight); // Remove max limit for better fit

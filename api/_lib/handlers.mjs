@@ -4,6 +4,7 @@ const groqModel = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 const groqKey = process.env.GROQ_API_KEY || '';
 const mistralModel = process.env.MISTRAL_MODEL || 'mistral-small-latest';
 const mistralKey = process.env.MISTRAL_API_KEY || '';
+const geminiTailorModel = process.env.GEMINI_TAILOR_MODEL || geminiParserModel;
 
 function collectSkills(skills) {
   if (!skills) return [];
@@ -106,12 +107,23 @@ async function generateWithFallback(contents, schema, opts={}) {
   const attempts=[];
   if (opts.primary==='groq') attempts.push(['groq',groqModel,groqKey]);
   if (opts.primary==='gemini') attempts.push(['gemini',geminiParserModel,geminiKey]);
-  attempts.push(['mistral',mistralModel,mistralKey]);
+  if (opts.primary==='mistral') attempts.push(['mistral',mistralModel,mistralKey]);
+  if (opts.includeGeminiFallback && opts.primary!=='gemini') attempts.push(['gemini',geminiTailorModel,geminiKey]);
+  if (opts.primary!=='mistral') attempts.push(['mistral',mistralModel,mistralKey]);
   let last;
   for (const [provider,model,key] of attempts) {
     if (!key) continue;
     try { return {data:await providerGenerate(provider,model,key,contents,schema,opts.timeoutMs||45000),provider,model}; }
-    catch(e) { last=e; console.warn(`${provider} failed:`, e.message); if (![408,409,429,500,502,503,504].includes(e.status||0)) break; }
+    catch(e) {
+      last=e;
+      console.warn(`${provider} failed:`, e.message);
+      if (![408,409,429,500,502,503,504].includes(e.status||0)) break;
+    }
+  }
+  if (last?.status === 429) {
+    const err = new Error('All configured AI providers are currently rate-limited. Please wait a moment and try again.');
+    err.status = 429;
+    throw err;
   }
   throw last || new Error('No AI provider is configured.');
 }
@@ -333,7 +345,7 @@ async function handleAgent(req,res){
         'Return one complete tailored content result, not generic advice.',
         `Return one complete tailored content result, not generic advice.\n\nFORCED REWRITE PASS: The previous attempt may have preserved the source too closely. You must rewrite the professional summary and every experience/project bullet that can be truthfully connected to the JD. Use materially different wording and stronger JD-relevant framing. Do not copy the original sentences verbatim. Reorder the existing skills so the most relevant supported skills appear first. If a requirement is unsupported, state it in gaps rather than adding it.`
       );
-      const tryTailor=async(prompt,primary)=>generateWithFallback([{parts:[{text:prompt}]}],tailorSchema,{primary,timeoutMs:45000});
+      const tryTailor=async(prompt,primary)=>generateWithFallback([{parts:[{text:prompt}]}],tailorSchema,{primary,timeoutMs:45000,includeGeminiFallback:primary==='mistral'});
       let tailoredResult=await tryTailor(basePrompt,'groq');
       let tailoredResume;
       try { tailoredResume=applyTailoring(b.resumeData,tailoredResult.data); } catch(e) { tailoredResume=null; }
@@ -357,7 +369,7 @@ async function handleAgent(req,res){
 
     const result=hasPdf && geminiKey
       ? await generateWithFallback(contents,agentSchema,{primary:'gemini',timeoutMs:60000})
-      : await generateWithFallback(contents,agentSchema,{primary:'groq',timeoutMs:45000});
+      : await generateWithFallback(contents,agentSchema,{primary:'groq',timeoutMs:45000,includeGeminiFallback:true});
     const raw=result.data||{};
     const candidate=raw.resumeData||raw.tailoredResume||raw.resume||raw.result?.resumeData||raw.data?.resumeData;
     const safeResume=sanitizeAgentResume(b.resumeData,candidate);

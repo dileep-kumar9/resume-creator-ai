@@ -133,3 +133,9 @@ npm run dev:server
 ```
 
 The local Node server remains available for development only.
+
+
+## Production notes
+- AI requests use provider fallback where configured; rate-limit responses are surfaced as a temporary retry message.
+- Light/dark theme is persisted locally in the browser.
+- The About page contains no inherited developer/source-repository links.

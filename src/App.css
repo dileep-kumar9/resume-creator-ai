@@ -85,10 +85,17 @@
   overflow: auto;
 }
 .resume-artifact-paper #resume-content {
-  width: 100% !important;
-  max-width: none !important;
   margin: 0 !important;
-  transform: none !important;
+  box-shadow: none !important;
+}
+.resume-artifact-paper > div {
+  max-width: 100%;
+}
+@media (max-width: 900px) {
+  .resume-artifact-sidebar { width: 94vw; }
+}
+@media (max-width: 640px) {
+  .resume-artifact-sidebar { width: 100vw; min-width: 0; }
 }
 @keyframes resumeSidebarIn {
   from { transform: translateX(18px); opacity: .72; }
