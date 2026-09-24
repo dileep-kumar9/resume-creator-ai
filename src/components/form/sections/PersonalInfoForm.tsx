@@ -43,6 +43,8 @@ export const PersonalInfoForm: React.FC = () => {
             <Label htmlFor="fullName">Full Name *</Label>
             <Input
               id="fullName"
+              name="fullName"
+              autoComplete="name"
               placeholder="John Doe"
               value={personalInfo.fullName}
               onChange={(e) => handleInputChange('fullName', e.target.value)}
@@ -53,6 +55,8 @@ export const PersonalInfoForm: React.FC = () => {
             <Label htmlFor="jobTitle">Job Title *</Label>
             <Input
               id="jobTitle"
+              name="jobTitle"
+              autoComplete="organization-title"
               placeholder="Software Engineer"
               value={personalInfo.jobTitle}
               onChange={(e) => handleInputChange('jobTitle', e.target.value)}
@@ -65,6 +69,8 @@ export const PersonalInfoForm: React.FC = () => {
             <Label htmlFor="birthDate">Birth Date (Optional)</Label>
             <Input
               id="birthDate"
+              name="birthDate"
+              autoComplete="bday"
               placeholder="February 11th, 1996"
               value={personalInfo.birthDate || ''}
               onChange={(e) => handleInputChange('birthDate', e.target.value)}
@@ -75,6 +81,8 @@ export const PersonalInfoForm: React.FC = () => {
             <Label htmlFor="location">Location *</Label>
             <Input
               id="location"
+              name="location"
+              autoComplete="address-level2"
               placeholder="New York, NY"
               value={personalInfo.location}
               onChange={(e) => handleInputChange('location', e.target.value)}
@@ -87,7 +95,9 @@ export const PersonalInfoForm: React.FC = () => {
             <Label htmlFor="email">Email *</Label>
             <Input
               id="email"
+              name="email"
               type="email"
+              autoComplete="email"
               placeholder="john@example.com"
               value={personalInfo.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
@@ -98,6 +108,9 @@ export const PersonalInfoForm: React.FC = () => {
             <Label htmlFor="phone">Phone *</Label>
             <Input
               id="phone"
+              name="phone"
+              type="tel"
+              autoComplete="tel"
               placeholder="+1 (555) 123-4567"
               value={personalInfo.phone}
               onChange={(e) => handleInputChange('phone', e.target.value)}
@@ -110,6 +123,9 @@ export const PersonalInfoForm: React.FC = () => {
             <Label htmlFor="website">Website</Label>
             <Input
               id="website"
+              name="website"
+              type="url"
+              autoComplete="url"
               placeholder="https://yourwebsite.com"
               value={personalInfo.website}
               onChange={(e) => handleInputChange('website', e.target.value)}
@@ -120,6 +136,9 @@ export const PersonalInfoForm: React.FC = () => {
             <Label htmlFor="linkedin">LinkedIn</Label>
             <Input
               id="linkedin"
+              name="linkedin"
+              type="url"
+              autoComplete="url"
               placeholder="https://linkedin.com/in/username"
               value={personalInfo.linkedin}
               onChange={(e) => handleInputChange('linkedin', e.target.value)}
@@ -130,6 +149,9 @@ export const PersonalInfoForm: React.FC = () => {
             <Label htmlFor="github">GitHub</Label>
             <Input
               id="github"
+              name="github"
+              type="url"
+              autoComplete="url"
               placeholder="https://github.com/username"
               value={personalInfo.github}
               onChange={(e) => handleInputChange('github', e.target.value)}
@@ -168,6 +190,8 @@ export const PersonalInfoForm: React.FC = () => {
               <input
                 type="file"
                 accept="image/*"
+                name="profileImage"
+                aria-label="Profile picture"
                 onChange={handleImageUpload}
                 className="hidden"
                 id="profile-image"

@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 
 const STORAGE_KEY = 'resume-agent-theme';
 
-export const ThemeToggle: React.FC<{ compact?: boolean }> = ({ compact = true }) => {
+export const ThemeToggle: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
