@@ -205,6 +205,7 @@ const AgentWorkspace:React.FC=()=>{
             <div className="resume-chat-composer">
               {attachment&&<div className="resume-chat-attachment"><FileText className="w-4 h-4"/><span>{attachment.name}</span><button type="button" onClick={()=>{setAttachment(null);setAttachmentText('');setAttachmentPdf('')}} aria-label="Remove attachment"><X className="w-3.5 h-3.5"/></button></div>}
               <Textarea
+                rows={1}
                 value={prompt}
                 onChange={e=>setPrompt(e.target.value)}
                 onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}}
