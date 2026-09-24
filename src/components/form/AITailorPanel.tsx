@@ -64,10 +64,14 @@ export const AITailorPanel: React.FC = () => {
       if (!response.ok) throw new Error(response.status === 429 ? 'AI providers are temporarily rate-limited. Please wait 30–60 seconds and try again.' : (result.error || `Resume Agent failed (${response.status})`));
       if (!result.resumeData) throw new Error('The Resume Agent returned an invalid resume result.');
       setPreviousResume(structuredClone(state.resumeData));
-      const next = result.resumeData as ResumeData;
-      // The original uploaded file is immutable. Once the user asks the agent to edit its content,
-      // use an editable template so preview/PDF/DOCX reflect the changes.
-      if (next.template === 'original-upload') next.template = 'modern-minimal';
+      const next = structuredClone(result.resumeData as ResumeData);
+      // The uploaded document remains the selected template until the user explicitly
+      // chooses another template. Never let an AI response silently switch it.
+      if (state.resumeData.originalTemplate) {
+        next.template = 'original-upload';
+        next.originalTemplate = structuredClone(state.resumeData.originalTemplate);
+        next.originalTemplate.tailored = true;
+      }
       importResumeData(next);
       setAnalysis(result.analysis || null);
       setChanges(Array.isArray(result.changes) ? result.changes : []);

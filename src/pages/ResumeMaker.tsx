@@ -77,6 +77,22 @@ const AgentWorkspace:React.FC=()=>{
     });
   },[artifactWidth,sidebarWidth]);
 
+  // If the browser/sidebar changes while the artifact is open, keep its width
+  // inside the same bounds used by the drag handler so the center conversation
+  // never becomes clipped.
+  useEffect(()=>{
+    const clampArtifact=()=>{
+      if(!resumeOpen)return;
+      const main=document.querySelector('.resume-studio-main') as HTMLElement | null;
+      const mainWidth=main?.clientWidth || window.innerWidth;
+      const max=Math.max(0, mainWidth-360);
+      setArtifactWidth(w=>Math.min(w,max));
+    };
+    clampArtifact();
+    window.addEventListener('resize',clampArtifact);
+    return()=>window.removeEventListener('resize',clampArtifact);
+  },[sidebarWidth,resumeOpen]);
+
   const rememberChatScrollPosition=()=>{
     const el=chatScrollRef.current;
     if(!el)return;
@@ -93,7 +109,10 @@ const AgentWorkspace:React.FC=()=>{
     const el=chatInputRef.current;
     if(!el)return;
     el.style.height='auto';
-    const maxHeight=Math.max(180, Math.min(420, Math.floor(window.innerHeight * 0.45)));
+    // Keep the action row (attachment/send) permanently visible. The old
+    // textarea could grow almost as tall as the composer itself and push the
+    // action row below the clipped bottom edge.
+    const maxHeight=Math.max(160, Math.min(520, Math.floor(window.innerHeight * 0.56)));
     const next=Math.min(Math.max(el.scrollHeight,34),maxHeight);
     el.style.height=`${next}px`;
     el.style.overflowY=el.scrollHeight>maxHeight?'auto':'hidden';
@@ -178,9 +197,12 @@ const AgentWorkspace:React.FC=()=>{
       // HARD RULE: the uploaded document is immutable metadata. AI responses
       // are never allowed to replace the selected template or the original
       // uploaded file. Template changes happen only through TemplateSelector.
-      next.template = workingResume.template;
       if (workingResume.originalTemplate) {
+        next.template = 'original-upload';
         next.originalTemplate = structuredClone(workingResume.originalTemplate);
+        next.originalTemplate.tailored = true;
+      } else {
+        next.template = workingResume.template;
       }
       importResumeData(next);
       setResumeOpen(true);
@@ -235,7 +257,13 @@ const AgentWorkspace:React.FC=()=>{
       const next=s.startWidth-(e.clientX-s.startX);
       // GPT-style artifact: the panel has no artificial 600px floor. It can
       // be dragged very narrow, with the center workspace taking the released space.
-      const max=Math.max(0,Math.min(1400,window.innerWidth-80));
+      const main = document.querySelector('.resume-studio-main') as HTMLElement | null;
+      const mainWidth = main?.clientWidth || window.innerWidth;
+      // Keep a real center conversation column visible while allowing the
+      // artifact itself to become arbitrarily narrow/closed. The old global
+      // window-width cap could consume the entire center pane and clip chat.
+      const minimumChatWidth = 360;
+      const max = Math.max(0, mainWidth - minimumChatWidth);
       const clamped=Math.max(0,Math.min(max,next));
       // ChatGPT-like behavior: dragging the artifact completely left closes it
       // instead of leaving a unusable sliver. There is no visible minimum width.
@@ -395,7 +423,7 @@ const AgentWorkspace:React.FC=()=>{
               <div className="flex items-center gap-2"><FileText className="w-4 h-4 shrink-0"/><span className="font-semibold truncate">Created resume</span></div>
               <div className="text-[11px] text-muted-foreground mt-0.5">
                 {state.resumeData.template==='original-upload'
-                  ? `Original uploaded file preserved · tailored content uses ${state.resumeData.originalTemplate?.editableTemplate || 'modern-minimal'} layout`
+                  ? (state.resumeData.originalTemplate?.tailored ? 'Original uploaded template selected · tailored content rendered in the original-style editable layout' : 'Original uploaded template selected')
                   : 'Editable template selected by you'}
               </div>
             </div>
@@ -416,19 +444,7 @@ const AgentWorkspace:React.FC=()=>{
             <span className="text-xs text-muted-foreground">Live artifact</span>
             <div className="flex gap-1">
               <Button size="sm" variant="ghost" onClick={()=>setResumeEditMode(false)}>Preview</Button>
-              <Button size="sm" variant={resumeEditMode?'secondary':'ghost'} onClick={()=>{
-                if (state.resumeData.template==='original-upload' && state.resumeData.originalTemplate && !state.resumeData.originalTemplate.tailored) {
-                  importResumeData({
-                    ...state.resumeData,
-                    originalTemplate: {
-                      ...state.resumeData.originalTemplate,
-                      tailored: true,
-                      editableTemplate: state.resumeData.originalTemplate.editableTemplate || 'modern-minimal'
-                    }
-                  });
-                }
-                setResumeEditMode(true);
-              }}>Edit</Button>
+              <Button size="sm" variant={resumeEditMode?'secondary':'ghost'} onClick={()=>setResumeEditMode(true)}>Edit</Button>
             </div>
           </div>
 

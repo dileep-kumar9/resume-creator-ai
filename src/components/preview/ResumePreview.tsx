@@ -6,6 +6,7 @@ import { ModernMinimalTemplate } from './templates/ModernMinimalTemplate';
 import { ElegantTimelineTemplate } from './templates/ElegantTimelineTemplate';
 import { CreativeModernTemplate } from './templates/CreativeModernTemplate';
 import { BJetProfessionalTemplate } from './templates/BJetProfessionalTemplate';
+import { OriginalUploadedTemplate } from './templates/OriginalUploadedTemplate';
 
 export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = false }) => {
   const { state } = useResume();
@@ -29,21 +30,14 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   // user explicitly chooses a built-in editable template.
   const visualTemplate = resumeData.template;
 
-  if (visualTemplate === 'original-upload' && resumeData.originalTemplate?.sourceDataUrl) {
+  if (visualTemplate === 'original-upload' && resumeData.originalTemplate?.sourceDataUrl && !resumeData.originalTemplate.tailored) {
     return (
       <div ref={previewHostRef} className="w-full h-full flex items-center justify-center p-2">
         <div id="resume-content" className="w-full h-full bg-white shadow-xl overflow-hidden">
           {resumeData.originalTemplate.sourceFormat === 'pdf' ? (
-            <iframe
-              title="Original uploaded resume"
-              src={resumeData.originalTemplate.sourceDataUrl}
-              className="w-full h-full border-0"
-            />
+            <iframe title="Original uploaded resume" src={resumeData.originalTemplate.sourceDataUrl} className="w-full h-full border-0" />
           ) : (
-            <div className="p-8 text-sm text-muted-foreground">
-              <strong>Original uploaded document:</strong> {resumeData.originalTemplate.sourceFileName}
-              <p className="mt-2">The original DOCX is preserved for download. Choose a built-in template to edit and export the parsed content.</p>
-            </div>
+            <div className="p-8 text-sm text-muted-foreground"><strong>Original uploaded document:</strong> {resumeData.originalTemplate.sourceFileName}<p className="mt-2">The original document is preserved as uploaded.</p></div>
           )}
         </div>
       </div>
@@ -64,6 +58,8 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
         return <CreativeModernTemplate data={resumeData} />;
       case 'bjet-professional':
         return <BJetProfessionalTemplate data={resumeData} />;
+      case 'original-upload':
+        return <OriginalUploadedTemplate data={resumeData} />;
       default:
         return <TechSidebarTemplate data={resumeData} />;
     }

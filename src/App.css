@@ -432,7 +432,7 @@ html, body, #root {
   pointer-events: auto;
   width: min(760px, 100%);
   min-height: 48px;
-  max-height: 48vh;
+  max-height: 64vh;
   margin: 0 auto;
   padding: 5px 7px 5px 9px;
   border: 1px solid hsl(var(--border));
@@ -444,9 +444,9 @@ html, body, #root {
 .resume-chat-input {
   width: 100%;
   min-height: 34px !important;
-  max-height: 45vh !important;
+  max-height: 56vh !important;
   resize: none;
-  overflow-y: hidden;
+  overflow-y: auto;
   border: 0 !important;
   outline: 0 !important;
   background: transparent !important;
@@ -883,3 +883,13 @@ html, body, #root {
   align-items: flex-start !important;
   justify-content: flex-start !important;
 }
+
+
+/* Final GPT-style artifact/chat safeguards. Keep the center conversation
+   usable even when the artifact is dragged very wide. The artifact itself has
+   no minimum width; it closes when dragged to zero. */
+.resume-chat-column { min-width: 360px; }
+.resume-artifact-panel { flex-shrink: 0; }
+.resume-chat-composer { overflow: hidden; }
+.resume-chat-input { box-sizing: border-box; }
+.resume-chat-composer-actions { flex: 0 0 32px; }
