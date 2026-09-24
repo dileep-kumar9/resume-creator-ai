@@ -1,4 +1,4 @@
-import { ResumeData, DEFAULT_COLORS, DEFAULT_SECTIONS, normalizeSkillLabels } from '../types/resume';
+import { ResumeData, DEFAULT_COLORS, DEFAULT_SECTIONS, normalizeSkillLabels, cleanMissingValue, cleanResumeDate } from '../types/resume';
 import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import mammoth from 'mammoth/mammoth.browser';

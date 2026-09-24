@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ResumeProvider, useResume } from '../contexts/ResumeContext';
 import { ResumeForm } from '../components/form/ResumeForm';
 import { ResumePreview } from '../components/preview/ResumePreview';
@@ -33,6 +33,18 @@ const AgentWorkspace:React.FC=()=>{
   const [messages,setMessages]=useState<ChatItem[]>([{id:'welcome',role:'assistant',text:'Upload your resume, paste a job description, or tell me what you want changed. I can tailor content, change templates, use a reference resume, make it one page, and export the result.'}]);
   const fileRef=useRef<HTMLInputElement>(null);
   const importRef=useRef<HTMLInputElement>(null);
+  const chatScrollRef=useRef<HTMLDivElement>(null);
+
+  // ChatGPT-style behavior: every new user/assistant message and the loading
+  // state keeps the conversation viewport at the newest content. The user can
+  // still scroll manually after the update.
+  useEffect(()=>{
+    const el=chatScrollRef.current;
+    if(!el)return;
+    requestAnimationFrame(()=>{
+      el.scrollTo({top:el.scrollHeight,behavior:'smooth'});
+    });
+  },[messages.length,loading]);
 
   const clearAttachment=()=>{
     setAttachment(null);
@@ -234,7 +246,7 @@ const AgentWorkspace:React.FC=()=>{
 
       <div className="resume-studio-workspace">
         <section className="resume-chat-column">
-          <div className="resume-chat-scroll">
+          <div ref={chatScrollRef} className="resume-chat-scroll">
             <div className="resume-chat-content">
               {messages.map(msg=><div key={msg.id} className={`resume-chat-row ${msg.role==='user'?'user':'assistant'}`}>
                 <div className={`resume-chat-message ${msg.role==='user'?'user-message':'assistant-message'}`}>
