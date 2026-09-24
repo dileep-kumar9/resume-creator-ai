@@ -77,8 +77,12 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   const containerWidth = artifact ? hostSize.width : 860;
   const containerHeight = artifact ? hostSize.height : 650;
   const scaleWidth = containerWidth / pageWidth;
-  const scaleHeight = containerHeight / pageHeight;
-  const scale = Math.min(1, scaleWidth, scaleHeight);
+  // In the Created Resume artifact, width is the user's adjustable constraint.
+  // Do not use the viewport height to shrink the entire page: let the artifact
+  // scroll vertically so the resume remains readable.
+  const scale = artifact
+    ? Math.min(1, scaleWidth)
+    : Math.min(1, scaleWidth, containerHeight / pageHeight);
 
   return (
     <div ref={previewHostRef} className="w-full h-full flex items-center justify-center p-2">

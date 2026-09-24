@@ -171,7 +171,7 @@ html, body, #root {
   height: 100vh;
   min-height: 0;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: var(--studio-sidebar-width, 320px) minmax(0, 1fr);
   overflow: hidden;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
@@ -501,8 +501,9 @@ html, body, #root {
 
 /* RIGHT — persistent GPT-style artifact */
 .resume-artifact-panel {
-  flex: 0 0 560px;
-  width: 560px;
+  position: relative;
+  flex: 0 0 var(--artifact-width, 760px);
+  width: var(--artifact-width, 760px);
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -606,19 +607,19 @@ html, body, #root {
 
 @media (max-width: 1250px) {
   .resume-artifact-panel {
-    flex-basis: 500px;
-    width: 500px;
+    flex-basis: min(var(--artifact-width, 760px), 62vw);
+    width: min(var(--artifact-width, 760px), 62vw);
   }
 }
 
 @media (max-width: 1000px) {
   .resume-studio-app {
-    grid-template-columns: 250px minmax(0, 1fr);
+    grid-template-columns: var(--studio-sidebar-width, 280px) minmax(0, 1fr);
   }
 
   .resume-artifact-panel {
-    flex-basis: 460px;
-    width: 460px;
+    flex-basis: min(var(--artifact-width, 760px), 68vw);
+    width: min(var(--artifact-width, 760px), 68vw);
   }
 }
 
@@ -690,16 +691,59 @@ html, body, #root {
 }
 
 
+/* GPT-style draggable divider for the left sidebar. */
+.resume-studio-sidebar {
+  position: relative;
+}
+.resume-studio-sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -5px;
+  bottom: 0;
+  width: 10px;
+  z-index: 100;
+  cursor: col-resize;
+  touch-action: none;
+  display: flex;
+  justify-content: center;
+}
+.resume-studio-sidebar-resize-handle::before {
+  content: "";
+  width: 2px;
+  height: 100%;
+  background: transparent;
+  transition: background .15s ease;
+}
+.resume-studio-sidebar-resize-handle:hover::before,
+.resume-studio-sidebar-resize-handle:active::before {
+  background: hsl(var(--primary) / .5);
+}
+.resume-studio-sidebar-resize-handle span {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 54px;
+  border-radius: 999px;
+  background: hsl(var(--muted-foreground) / .4);
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.resume-studio-sidebar-resize-handle:hover span,
+.resume-studio-sidebar-resize-handle:active span {
+  opacity: 1;
+}
+
 /* GPT-style sidebar behavior: collapsed means navigation-only.
    Never squeeze the editor into a 64px rail. */
-.sidebar-collapsed .resume-studio-panel {
+.resume-studio-app.sidebar-collapsed .resume-studio-panel {
   display: none !important;
 }
 
 /* Keep the expanded Studio sidebar comfortable and prevent tab labels
    from colliding with one another. */
-.sidebar-expanded .resume-studio-app {
-  grid-template-columns: 320px minmax(0, 1fr);
+.resume-studio-app.sidebar-expanded {
+  grid-template-columns: var(--studio-sidebar-width, 320px) minmax(0, 1fr);
 }
 .resume-studio-panel .p-6 {
   padding: 14px !important;
@@ -744,7 +788,7 @@ html, body, #root {
 }
 
 @media (max-width: 1000px) {
-  .sidebar-expanded .resume-studio-app {
+  .resume-studio-app.sidebar-expanded {
     grid-template-columns: 280px minmax(0, 1fr);
   }
 }
@@ -758,7 +802,7 @@ html, body, #root {
   position: sticky;
   top: 0;
   z-index: 8;
-  min-height: 42px;
+  min-height: 76px;
   padding: 4px;
   border: 1px solid hsl(var(--border));
   border-radius: 10px;
@@ -768,6 +812,7 @@ html, body, #root {
 .resume-form-tab {
   min-width: 0 !important;
   width: 100%;
+  min-height: 32px;
   height: 32px;
   padding: 0 7px !important;
   border-radius: 7px !important;
@@ -812,3 +857,27 @@ html, body, #root {
 }
 .resume-artifact-resize-handle:hover span,
 .resume-artifact-resize-handle:active span { opacity: 1; }
+
+/* Prevent the four editor section tabs from colliding in the narrow Studio
+   sidebar. They are intentionally a compact 2x2 control instead of four
+   squeezed columns. */
+.resume-form-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-auto-rows: 32px;
+}
+.resume-form-tab {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 12px !important;
+}
+
+/* Artifact preview uses its available WIDTH as the source of truth. Its
+   document can become taller than the viewport and scroll vertically instead
+   of shrinking the resume until the text is unreadable. */
+.resume-artifact-preview {
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+}

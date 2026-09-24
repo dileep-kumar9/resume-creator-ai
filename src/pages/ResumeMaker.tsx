@@ -21,7 +21,8 @@ const AgentWorkspace:React.FC=()=>{
   const [sidebarOpen,setSidebarOpen]=useState(true);
   const [resumeOpen,setResumeOpen]=useState(false);
   const [resumeEditMode,setResumeEditMode]=useState(false);
-  const [artifactWidth,setArtifactWidth]=useState(560);
+  const [artifactWidth,setArtifactWidth]=useState(760);
+  const [sidebarWidth,setSidebarWidth]=useState(320);
   const [panel,setPanel]=useState<SidePanel>('content');
   const [prompt,setPrompt]=useState('');
   const [loading,setLoading]=useState(false);
@@ -158,26 +159,31 @@ const AgentWorkspace:React.FC=()=>{
 
   const docx=()=>exportResumeToDOCX(state.resumeData);
   const panelMap:any={content:'form',customize:'customize',settings:'settings',templates:'templates'};
-  const resizeState=useRef<{startX:number;startWidth:number;pointerId:number}|null>(null);
-  const startArtifactResize=(e:React.PointerEvent<HTMLDivElement>)=>{
-    if(!resumeOpen)return;
+  const resizeState=useRef<{startX:number;startWidth:number;pointerId:number;kind:'artifact'|'sidebar'}|null>(null);
+  const startResize=(kind:'artifact'|'sidebar')=>(e:React.PointerEvent<HTMLDivElement>)=>{
     e.preventDefault();
     e.stopPropagation();
-    resizeState.current={startX:e.clientX,startWidth:artifactWidth,pointerId:e.pointerId};
+    const startWidth=kind==='artifact'?artifactWidth:sidebarWidth;
+    resizeState.current={startX:e.clientX,startWidth,pointerId:e.pointerId,kind};
     try{e.currentTarget.setPointerCapture(e.pointerId);}catch{}
     document.body.style.cursor='col-resize';
     document.body.style.userSelect='none';
   };
-  const moveArtifactResize=(e:React.PointerEvent<HTMLDivElement>)=>{
+  const moveResize=(e:React.PointerEvent<HTMLDivElement>)=>{
     const s=resizeState.current;
     if(!s)return;
     e.preventDefault();
-    const next=s.startWidth-(e.clientX-s.startX);
-    const min=420;
-    const max=Math.max(min,Math.min(900,window.innerWidth-360));
-    setArtifactWidth(Math.max(min,Math.min(max,next)));
+    if(s.kind==='artifact'){
+      const next=s.startWidth-(e.clientX-s.startX);
+      const min=600;
+      const max=Math.max(min,Math.min(980,window.innerWidth-360));
+      setArtifactWidth(Math.max(min,Math.min(max,next)));
+    }else{
+      const next=s.startWidth+(e.clientX-s.startX);
+      setSidebarWidth(Math.max(260,Math.min(420,next)));
+    }
   };
-  const endArtifactResize=(e?:React.PointerEvent<HTMLDivElement>)=>{
+  const endResize=(e?:React.PointerEvent<HTMLDivElement>)=>{
     if(!resizeState.current)return;
     if(e)try{e.currentTarget.releasePointerCapture(e.pointerId);}catch{}
     resizeState.current=null;
@@ -194,7 +200,10 @@ const AgentWorkspace:React.FC=()=>{
     ['settings','Settings',Settings],
   ];
 
-  return <div className={`resume-studio-app ${sidebarOpen?'sidebar-expanded':'sidebar-collapsed'} ${resumeOpen?'artifact-open':'artifact-closed'}`}>
+  return <div
+    className={`resume-studio-app ${sidebarOpen?'sidebar-expanded':'sidebar-collapsed'} ${resumeOpen?'artifact-open':'artifact-closed'}`}
+    style={{'--studio-sidebar-width':`${sidebarWidth}px`,'--artifact-width':`${artifactWidth}px`} as React.CSSProperties}
+  >
     <aside className="resume-studio-sidebar">
       <div className="resume-studio-brand">
         <span className="resume-studio-brand-full">Resume Studio</span>
@@ -221,6 +230,17 @@ const AgentWorkspace:React.FC=()=>{
       <div className="resume-studio-panel">
         <ResumeForm activePanel={panelMap[panel]}/>
       </div>
+      {sidebarOpen && <div
+        className="resume-studio-sidebar-resize-handle"
+        onPointerDown={e=>startResize('sidebar')(e)}
+        onPointerMove={moveResize}
+        onPointerUp={endResize}
+        onPointerCancel={endResize}
+        title="Drag to resize sidebar"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
+      ><span /></div>}
     </aside>
 
     <main className="resume-studio-main">
@@ -234,6 +254,15 @@ const AgentWorkspace:React.FC=()=>{
           <ThemeToggle compact={true}/>
           <Button size="sm" variant="ghost" onClick={undo} disabled={!history.length} title="Undo last AI change">
             <RotateCcw className="w-4 h-4 md:mr-2"/><span className="hidden md:inline">Undo</span>
+          </Button>
+          <Button
+            size="sm"
+            variant={resumeOpen?'secondary':'ghost'}
+            onClick={()=>{setResumeOpen(v=>!v); if(resumeOpen)setResumeEditMode(false);}}
+            title={resumeOpen?'Close created resume':'Open created resume'}
+            aria-label={resumeOpen?'Close created resume':'Open created resume'}
+          >
+            <FileText className="w-4 h-4 md:mr-2"/><span className="hidden md:inline">{resumeOpen?'Artifact':'Open artifact'}</span>
           </Button>
           <Button size="sm" variant="ghost" onClick={docx} title="Export DOCX">
             <FileDown className="w-4 h-4 md:mr-2"/><span className="hidden md:inline">DOCX</span>
@@ -290,7 +319,7 @@ const AgentWorkspace:React.FC=()=>{
         </section>
 
         {resumeOpen&&<aside className="resume-artifact-panel" style={{width:artifactWidth,flexBasis:artifactWidth}} aria-label="Created resume artifact">
-          <div className="resume-artifact-resize-handle" onPointerDown={startArtifactResize} onPointerMove={moveArtifactResize} onPointerUp={endArtifactResize} onPointerCancel={endArtifactResize} title="Drag to resize created resume" role="separator" aria-orientation="vertical" aria-label="Resize created resume">
+          <div className="resume-artifact-resize-handle" onPointerDown={e=>startResize('artifact')(e)} onPointerMove={moveResize} onPointerUp={endResize} onPointerCancel={endResize} title="Drag to resize created resume" role="separator" aria-orientation="vertical" aria-label="Resize created resume">
             <span />
           </div>
           <div className="resume-artifact-header">

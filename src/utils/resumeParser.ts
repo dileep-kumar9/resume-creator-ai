@@ -59,47 +59,128 @@ function blankResume(): ResumeData {
 export function normalizeParsedResume(parsed: ParsedResumePayload, base?: ResumeData): ResumeData {
   const fallback = base ? structuredClone(base) : blankResume();
   const p: Partial<ResumeData['personalInfo']> = parsed.personalInfo || {};
+
+  // AI output is treated as a set of proposed edits, not a replacement for
+  // factual source data. Empty/missing fields never erase the uploaded resume.
+  const pick = (value: unknown, original: string) => {
+    const cleaned = cleanMissingValue(value);
+    return cleaned || original || '';
+  };
+
   fallback.personalInfo = {
     ...fallback.personalInfo,
-    ...p,
-    fullName: cleanMissingValue(p.fullName),
-    jobTitle: cleanMissingValue(p.jobTitle),
-    email: cleanMissingValue(p.email),
-    phone: cleanMissingValue(p.phone),
-    location: cleanMissingValue(p.location),
-    website: normalizeUrl(cleanMissingValue(p.website)),
-    linkedin: normalizeUrl(cleanMissingValue(p.linkedin)),
-    github: normalizeUrl(cleanMissingValue(p.github))
+    fullName: pick(p.fullName, fallback.personalInfo.fullName),
+    jobTitle: pick(p.jobTitle, fallback.personalInfo.jobTitle),
+    email: pick(p.email, fallback.personalInfo.email),
+    phone: pick(p.phone, fallback.personalInfo.phone),
+    location: pick(p.location, fallback.personalInfo.location),
+    website: normalizeUrl(pick(p.website, fallback.personalInfo.website)),
+    linkedin: normalizeUrl(pick(p.linkedin, fallback.personalInfo.linkedin)),
+    github: normalizeUrl(pick(p.github, fallback.personalInfo.github))
   };
-  fallback.summary = typeof parsed.summary === 'string' ? parsed.summary : fallback.summary;
-  fallback.experience = Array.isArray(parsed.experience) ? parsed.experience.map((x: any) => ({
-    id: x.id || uid('exp'), jobTitle: cleanMissingValue(x.jobTitle), company: cleanMissingValue(x.company), location: cleanMissingValue(x.location),
-    startDate: cleanResumeDate(x.startDate), endDate: cleanResumeDate(x.endDate), current: Boolean(x.current), description: cleanMissingValue(x.description),
-    bulletPoints: Array.isArray(x.bulletPoints) ? x.bulletPoints.filter((v:any)=>typeof v==='string'&&v.trim()).map((v:any)=>v.trim()) : []
-  })) : fallback.experience;
-  fallback.education = Array.isArray(parsed.education) ? parsed.education.map((x: any) => ({
-    id: x.id || uid('edu'), degree: cleanMissingValue(x.degree), institution: cleanMissingValue(x.institution), location: cleanMissingValue(x.location),
-    graduationYear: cleanMissingValue(x.graduationYear), gpa: cleanMissingValue(x.gpa), honors: cleanMissingValue(x.honors)
-  })) : fallback.education;
-  fallback.projects = Array.isArray(parsed.projects) ? parsed.projects.map((x: any) => ({
-    id: x.id || uid('project'), title: cleanMissingValue(x.title), description: cleanMissingValue(x.description),
-    technologies: Array.isArray(x.technologies) ? normalizeSkillLabels(x.technologies) : [], liveUrl: normalizeUrl(cleanMissingValue(x.liveUrl)),
-    githubUrl: normalizeUrl(cleanMissingValue(x.githubUrl)), startDate: cleanResumeDate(x.startDate), endDate: cleanResumeDate(x.endDate)
-  })) : fallback.projects;
-  if (parsed.skills) {
-    fallback.skills = {
-      mode: parsed.skills.mode === 'categorized' ? 'categorized' : 'simple',
-      simple: Array.isArray(parsed.skills.simple) ? normalizeSkillLabels(parsed.skills.simple) : [],
-      categorized: Array.isArray(parsed.skills.categorized)
-        ? parsed.skills.categorized.map((c: any) => ({
-            id: c.id || uid('skill'),
-            name: c.name || 'Skills',
-            skills: Array.isArray(c.skills) ? normalizeSkillLabels(c.skills) : []
-          }))
-        : []
-    };
+
+  if (typeof parsed.summary === 'string' && parsed.summary.trim()) {
+    fallback.summary = parsed.summary.trim();
   }
-  fallback.customSections = Array.isArray(parsed.customSections) ? parsed.customSections : fallback.customSections;
+
+  if (Array.isArray(parsed.experience) && parsed.experience.length) {
+    fallback.experience = parsed.experience.map((x: any, index: number) => {
+      const original: any = fallback.experience[index] || {};
+      const bullets = Array.isArray(x.bulletPoints)
+        ? x.bulletPoints.filter((v:any)=>typeof v==='string'&&v.trim()).map((v:any)=>v.trim())
+        : [];
+      return {
+        id: original.id || x.id || uid('exp'),
+        jobTitle: pick(x.jobTitle, original.jobTitle),
+        company: pick(x.company, original.company),
+        location: pick(x.location, original.location),
+        // Employment dates are source facts. Keep them unless the user edits
+        // them directly in the editor.
+        startDate: original.startDate || cleanResumeDate(x.startDate),
+        endDate: original.endDate || cleanResumeDate(x.endDate),
+        current: typeof x.current === 'boolean' ? (original.startDate ? original.current : x.current) : Boolean(original.current),
+        description: pick(x.description, original.description),
+        bulletPoints: bullets.length ? bullets : (original.bulletPoints || [])
+      };
+    });
+    // Never silently delete source experience entries if the AI returns fewer.
+    if (fallback.experience.length < (base?.experience.length || 0)) {
+      fallback.experience = fallback.experience.concat(
+        (base?.experience || []).slice(fallback.experience.length)
+      );
+    }
+  }
+
+  if (Array.isArray(parsed.education) && parsed.education.length) {
+    fallback.education = parsed.education.map((x: any, index: number) => {
+      const original: any = fallback.education[index] || {};
+      return {
+        id: original.id || x.id || uid('edu'),
+        degree: pick(x.degree, original.degree),
+        institution: pick(x.institution, original.institution),
+        location: pick(x.location, original.location),
+        graduationYear: pick(x.graduationYear, original.graduationYear),
+        gpa: pick(x.gpa, original.gpa),
+        honors: pick(x.honors, original.honors)
+      };
+    });
+    if (fallback.education.length < (base?.education.length || 0)) {
+      fallback.education = fallback.education.concat(
+        (base?.education || []).slice(fallback.education.length)
+      );
+    }
+  }
+
+  if (Array.isArray(parsed.projects) && parsed.projects.length) {
+    fallback.projects = parsed.projects.map((x: any, index: number) => {
+      const original: any = fallback.projects[index] || {};
+      const technologies = Array.isArray(x.technologies)
+        ? normalizeSkillLabels(x.technologies)
+        : [];
+      return {
+        id: original.id || x.id || uid('project'),
+        title: pick(x.title, original.title),
+        description: pick(x.description, original.description),
+        technologies: technologies.length ? technologies : (original.technologies || []),
+        liveUrl: normalizeUrl(pick(x.liveUrl, original.liveUrl)),
+        githubUrl: normalizeUrl(pick(x.githubUrl, original.githubUrl)),
+        // Project dates are also preserved from the uploaded source.
+        startDate: original.startDate || cleanResumeDate(x.startDate),
+        endDate: original.endDate || cleanResumeDate(x.endDate)
+      };
+    });
+    if (fallback.projects.length < (base?.projects.length || 0)) {
+      fallback.projects = fallback.projects.concat(
+        (base?.projects || []).slice(fallback.projects.length)
+      );
+    }
+  }
+
+  if (parsed.skills) {
+    const simple = Array.isArray(parsed.skills.simple)
+      ? normalizeSkillLabels(parsed.skills.simple)
+      : [];
+    const categorized = Array.isArray(parsed.skills.categorized)
+      ? parsed.skills.categorized.map((c: any) => ({
+          id: c.id || uid('skill'),
+          name: cleanMissingValue(c.name) || 'Skills',
+          skills: Array.isArray(c.skills) ? normalizeSkillLabels(c.skills) : []
+        })).filter((c:any)=>c.skills.length)
+      : [];
+
+    if (simple.length || categorized.length) {
+      fallback.skills = {
+        mode: categorized.length ? 'categorized' : 'simple',
+        simple: simple.length ? simple : fallback.skills.simple,
+        categorized: categorized.length ? categorized : fallback.skills.categorized
+      };
+    }
+  }
+
+  if (Array.isArray(parsed.customSections) && parsed.customSections.length) {
+    fallback.customSections = parsed.customSections;
+  }
+
   return fallback;
 }
 
