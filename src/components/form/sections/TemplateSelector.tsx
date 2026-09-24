@@ -36,8 +36,7 @@ export const TemplateSelector: React.FC = () => {
                 <Badge variant="outline" className="text-xs">Imported {state.resumeData.originalTemplate.sourceFormat.toUpperCase()}</Badge>
                 {state.resumeData.originalTemplate.tailored && (
                   <div className="rounded-md bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-muted-foreground">
-                    Original remains selected as your reference. Your tailored content is rendered in the editable layout
-                    <strong className="text-foreground"> {state.resumeData.originalTemplate.editableTemplate || 'modern-minimal'}</strong>.
+                    Original uploaded template remains selected. Tailoring changed the resume data only; choose a built-in template yourself if you want the tailored content rendered in an editable layout.
                   </div>
                 )}
                 <Button

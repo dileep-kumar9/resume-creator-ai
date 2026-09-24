@@ -432,6 +432,7 @@ html, body, #root {
   pointer-events: auto;
   width: min(760px, 100%);
   min-height: 48px;
+  max-height: 48vh;
   margin: 0 auto;
   padding: 5px 7px 5px 9px;
   border: 1px solid hsl(var(--border));
@@ -443,8 +444,7 @@ html, body, #root {
 .resume-chat-input {
   width: 100%;
   min-height: 34px !important;
-  height: 34px !important;
-  max-height: 260px !important;
+  max-height: 45vh !important;
   resize: none;
   overflow-y: hidden;
   border: 0 !important;
@@ -500,6 +500,8 @@ html, body, #root {
 .resume-artifact-panel {
   position: relative;
   flex: 0 0 var(--artifact-width, 760px);
+  min-width: 0 !important;
+  max-width: none !important;
   width: var(--artifact-width, 760px);
   min-width: 0;
   min-height: 0;
@@ -559,7 +561,7 @@ html, body, #root {
   padding: 18px;
   display: flex;
   align-items: flex-start;
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .resume-artifact-editor > div {

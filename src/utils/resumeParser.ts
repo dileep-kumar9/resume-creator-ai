@@ -1,4 +1,4 @@
-import { ResumeData, DEFAULT_COLORS, DEFAULT_SECTIONS, normalizeSkillLabels, cleanMissingValue, cleanResumeDate } from '../types/resume';
+import { ResumeData, Experience, Project, SkillCategory, DEFAULT_COLORS, DEFAULT_SECTIONS, normalizeSkillLabels, cleanMissingValue, cleanResumeDate } from '../types/resume';
 import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import mammoth from 'mammoth/mammoth.browser';
@@ -23,20 +23,61 @@ async function extractPdfText(file: File) {
   const data = new Uint8Array(await file.arrayBuffer());
   const pdf = await pdfjsLib.getDocument({ data }).promise;
   const pages: string[] = [];
+
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const items = content.items as Array<{ str?: string; transform?: number[] }>;
-    // Keep visual order. PDF text items are already approximately ordered, but sorting by
-    // vertical position first avoids columns being randomly interleaved in many resumes.
-    const sorted = items.slice().sort((a, b) => {
-      const ay = a.transform?.[5] ?? 0;
-      const by = b.transform?.[5] ?? 0;
-      if (Math.abs(ay - by) > 3) return by - ay;
-      return (a.transform?.[4] ?? 0) - (b.transform?.[4] ?? 0);
-    });
-    pages.push(sorted.map((item) => item.str || '').join(' ').replace(/\s+/g, ' ').trim());
+    const items = (content.items as Array<{ str?: string; transform?: number[] }>)
+      .filter(item => String(item.str || '').trim());
+
+    // Preserve actual visual line breaks. The previous implementation flattened
+    // an entire PDF page into one giant line, which made the local fallback
+    // unable to recognize headings such as EXPERIENCE / PROJECTS / EDUCATION.
+    const rows: Array<{ y: number; items: Array<{ str?: string; transform?: number[] }> }> = [];
+    const tolerance = 3;
+
+    for (const item of items) {
+      const y = item.transform?.[5] ?? 0;
+      let row = rows.find(r => Math.abs(r.y - y) <= tolerance);
+      if (!row) {
+        row = { y, items: [] };
+        rows.push(row);
+      }
+      row.items.push(item);
+    }
+
+    rows.sort((a, b) => b.y - a.y);
+
+    const pageLines: string[] = [];
+    for (const row of rows) {
+      const sorted = row.items.slice().sort(
+        (a, b) => (a.transform?.[4] ?? 0) - (b.transform?.[4] ?? 0)
+      );
+
+      // Split obvious two-column jumps into separate logical lines. This keeps
+      // left-column education/skills from being concatenated with right-column
+      // summary/experience text.
+      let current = '';
+      let previousX: number | null = null;
+      for (const item of sorted) {
+        const x = item.transform?.[4] ?? 0;
+        const text = String(item.str || '').replace(/\s+/g, ' ').trim();
+        if (!text) continue;
+
+        if (current && previousX !== null && x - previousX > 170) {
+          pageLines.push(current.trim());
+          current = text;
+        } else {
+          current = current ? `${current} ${text}` : text;
+        }
+        previousX = x;
+      }
+      if (current.trim()) pageLines.push(current.trim());
+    }
+
+    pages.push(pageLines.join('\n'));
   }
+
   return pages.filter(Boolean).join('\n\n');
 }
 
@@ -239,15 +280,220 @@ export async function parseResumeWithAI(input: { text?: string; pdfBase64?: stri
 
 export function parseResumeHeuristically(text: string): ResumeData {
   const data = blankResume();
-  const lines = text.split(/\n+/).map((x) => x.trim()).filter(Boolean);
+  // Recover section boundaries even when a PDF extractor places a heading and
+  // the first line of content on the same visual row.
+  const normalizedText = text
+    .replace(/\r/g, '')
+    .replace(/\b(PROFESSIONAL SUMMARY|CORE SKILLS|INTERNSHIP EXPERIENCE|PROFESSIONAL EXPERIENCE|WORK EXPERIENCE|KEY PROJECTS|PROJECTS|EDUCATION|CERTIFICATIONS)\b/gi, '\n$1\n');
+  const rawLines = normalizedText.split(/\n+/).map(x => x.trim()).filter(Boolean);
+  const lines = rawLines.map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
+
   const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || '';
-  const phone = text.match(/(?:\+?\d[\d\s().-]{8,}\d)/)?.[0] || '';
+  const phone = text.match(/(?:\+?\d[\d\s().-]{8,}\d)/)?.[0]?.trim() || '';
+  const urls = text.match(/https?:\/\/[^\s|]+/gi) || [];
+
   data.personalInfo.email = email;
   data.personalInfo.phone = phone;
-  data.personalInfo.fullName = lines.find((line) => /^[A-Za-z][A-Za-z .'-]{2,45}$/.test(line) && !/resume|curriculum vitae|experience|education|skills/i.test(line)) || '';
-  const summaryIndex = lines.findIndex((x) => /^(professional summary|summary|profile|objective)$/i.test(x));
-  if (summaryIndex >= 0) data.summary = lines.slice(summaryIndex + 1, Math.min(summaryIndex + 4, lines.length)).join(' ');
-  const skillsIndex = lines.findIndex((x) => /^skills?$/i.test(x));
-  if (skillsIndex >= 0) data.skills.simple = lines.slice(skillsIndex + 1).join(' ').split(/[,•|]/).map((x) => x.trim()).filter((x) => x.length > 1 && x.length < 50).slice(0, 40);
+  data.personalInfo.linkedin = normalizeUrl(
+    (text.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[A-Za-z0-9._-]+/i)?.[0] || '')
+  );
+  const portfolioMatch =
+    urls.find(u => !/linkedin\.com/i.test(u)) ||
+    text.match(/(?:https?:\/\/)?[A-Za-z0-9._-]+\.github\.io\/?[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]*/i)?.[0] ||
+    '';
+  data.personalInfo.website = normalizeUrl(portfolioMatch);
+
+  // Most resumes put the candidate name on the first line. Prefer that over
+  // guessing from arbitrary text later in the document.
+  const firstUseful = lines.slice(0, 5).find(line =>
+    /^[A-Za-z][A-Za-z .'-]{2,60}$/.test(line) &&
+    !/resume|curriculum vitae|professional summary|summary|profile|objective/i.test(line)
+  );
+  data.personalInfo.fullName = firstUseful || '';
+
+  const headerIndex = data.personalInfo.fullName ? lines.indexOf(data.personalInfo.fullName) : 0;
+  const contactLine = lines.slice(headerIndex + 1, headerIndex + 4).join(' | ');
+  const locationMatch = contactLine.match(/\b([A-Z][A-Za-z .'-]+,\s*[A-Z][A-Za-z .'-]+)\b/);
+  data.personalInfo.location = locationMatch?.[1]?.trim() || '';
+
+  // Locate major sections. This is intentionally conservative: the local
+  // parser is a fallback, so it should preserve source facts rather than invent
+  // structure from unrelated prose.
+  const sectionAliases: Record<string, RegExp> = {
+    summary: /^(professional summary|summary|profile|objective)$/i,
+    skills: /^(core skills|skills|technical skills)$/i,
+    experience: /^(internship experience|professional experience|work experience|experience)$/i,
+    projects: /^(key projects|projects|project experience)$/i,
+    education: /^education$/i,
+    certifications: /^(certifications|certificates)$/i
+  };
+
+  const sectionAt: Record<string, number> = {};
+  lines.forEach((line, i) => {
+    for (const [key, re] of Object.entries(sectionAliases)) {
+      if (re.test(line) && sectionAt[key] === undefined) sectionAt[key] = i;
+    }
+  });
+
+  // Job title is normally between the contact/header block and the first section.
+  const firstSection = Math.min(...Object.values(sectionAt).filter(Number.isFinite));
+  if (Number.isFinite(firstSection)) {
+    const candidates = lines.slice(headerIndex + 1, firstSection).filter(line =>
+      !line.includes('@') && !/\b\d{7,}\b/.test(line) &&
+      !/linkedin\.com|github\.com|https?:\/\//i.test(line)
+    );
+    const title = candidates.find(line => line.length > 4 && !/,/.test(line));
+    if (title) data.personalInfo.jobTitle = title;
+  }
+
+  const sectionEnd = (start: number | undefined) => {
+    if (start === undefined) return lines.length;
+    const later = Object.values(sectionAt).filter(i => i > start);
+    return later.length ? Math.min(...later) : lines.length;
+  };
+
+  // Summary
+  if (sectionAt.summary !== undefined) {
+    const a = sectionAt.summary + 1;
+    const b = sectionEnd(sectionAt.summary);
+    data.summary = lines.slice(a, b).filter(Boolean).join(' ').trim();
+  }
+
+  // Skills. Preserve categories such as "Customer Support:" rather than
+  // flattening everything into one malformed string.
+  if (sectionAt.skills !== undefined) {
+    const skillLines = lines.slice(sectionAt.skills + 1, sectionEnd(sectionAt.skills));
+    const categorized: SkillCategory[] = [];
+    const simple: string[] = [];
+    for (const line of skillLines) {
+      const clean = line.replace(/^[•·*-]\s*/, '').trim();
+      if (!clean) continue;
+      const colon = clean.indexOf(':');
+      if (colon > 0 && colon < 45) {
+        const name = clean.slice(0, colon).trim();
+        const values = normalizeSkillLabels(clean.slice(colon + 1).split(/[,;|]/));
+        if (values.length) categorized.push({ id: uid('skill'), name, skills: values });
+      } else {
+        simple.push(...normalizeSkillLabels(clean.split(/[,;|]/)));
+      }
+    }
+    if (categorized.length) {
+      data.skills = { mode: 'categorized', simple, categorized };
+    } else {
+      data.skills = { mode: 'simple', simple: normalizeSkillLabels(simple), categorized: [] };
+    }
+  }
+
+  const parseDateRange = (value: string) => {
+    const cleaned = value.replace(/[–—]/g, '-').trim();
+    const parts = cleaned.split(/\s+-\s+/);
+    if (parts.length === 2) {
+      return { startDate: cleanResumeDate(parts[0]), endDate: cleanResumeDate(parts[1]) };
+    }
+    return { startDate: cleanResumeDate(cleaned), endDate: '' };
+  };
+
+  // Experience entries: "Title | Company | Date" followed by bullet lines.
+  if (sectionAt.experience !== undefined) {
+    const block = lines.slice(sectionAt.experience + 1, sectionEnd(sectionAt.experience));
+    let current: Experience | null = null;
+    const flush = () => {
+      if (current) {
+        current.description = current.bulletPoints.join('\n');
+        data.experience.push(current);
+      }
+    };
+    for (const line of block) {
+      const clean = line.replace(/^[•·*-]\s*/, '').trim();
+      const parts = clean.split('|').map(x => x.trim()).filter(Boolean);
+      if (parts.length >= 2 && !clean.startsWith('•')) {
+        flush();
+        const dates = parts.length >= 3 ? parseDateRange(parts.slice(2).join(' | ')) : {startDate:'',endDate:''};
+        current = {
+          id: uid('exp'),
+          jobTitle: parts[0],
+          company: parts[1],
+          location: '',
+          startDate: dates.startDate,
+          endDate: dates.endDate,
+          current: /present|current/i.test(parts.slice(2).join(' ')),
+          description: '',
+          bulletPoints: []
+        };
+      } else if (current) {
+        current.bulletPoints.push(clean);
+      }
+    }
+    flush();
+  }
+
+  // Projects: "Project | Tech stack | Date" followed by bullets/descriptions.
+  if (sectionAt.projects !== undefined) {
+    const block = lines.slice(sectionAt.projects + 1, sectionEnd(sectionAt.projects));
+    let current: Project | null = null;
+    const flush = () => {
+      if (current) {
+        current.description = current.description.trim() || current.title;
+        data.projects.push(current);
+      }
+    };
+    for (const line of block) {
+      const clean = line.replace(/^[•·*-]\s*/, '').trim();
+      const parts = clean.split('|').map(x => x.trim()).filter(Boolean);
+      const looksLikeEntry = parts.length >= 2 && (
+        /python|java|sql|react|node|flask|opencv|firebase|gpt|api|django|aws|javascript|typescript|mongodb|html|css/i.test(parts[1]) ||
+        parts.length >= 3
+      );
+      if (looksLikeEntry) {
+        flush();
+        const datePart = parts.length >= 3 ? parts[2] : '';
+        const dates = parseDateRange(datePart);
+        current = {
+          id: uid('project'),
+          title: parts[0],
+          description: '',
+          technologies: normalizeSkillLabels((parts[1] || '').split(/[,;]+/)),
+          liveUrl: '',
+          githubUrl: '',
+          startDate: dates.startDate,
+          endDate: dates.endDate
+        };
+      } else if (current) {
+        current.description = current.description
+          ? `${current.description}\n${clean}`
+          : clean;
+      }
+    }
+    flush();
+  }
+
+  // Education lines commonly appear as bullets with degree, institution and
+  // CGPA/year in the same line. Parse those without inventing missing fields.
+  if (sectionAt.education !== undefined) {
+    const block = lines.slice(sectionAt.education + 1, sectionEnd(sectionAt.education));
+    for (const line of block) {
+      const clean = line.replace(/^[•·*-]\s*/, '').trim();
+      if (!clean) continue;
+      const parts = clean.split('|').map(x => x.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        const degree = parts[0];
+        const institution = parts[1];
+        const gpa = clean.match(/(?:CGPA|GPA|Percentage|%)[\s:]+([0-9.]+%?)/i)?.[1] || '';
+        const years = clean.match(/\b((?:19|20)\d{2})\s*-\s*((?:19|20)\d{2})\b/);
+        const graduationYear = years?.[2] || years?.[1] || '';
+        data.education.push({
+          id: uid('edu'),
+          degree,
+          institution,
+          location: '',
+          graduationYear,
+          gpa,
+          honors: ''
+        });
+      }
+    }
+  }
+
   return data;
 }
+

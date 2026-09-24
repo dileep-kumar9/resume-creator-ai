@@ -21,7 +21,7 @@ const AgentWorkspace:React.FC=()=>{
   const [sidebarOpen,setSidebarOpen]=useState(true);
   const [resumeOpen,setResumeOpen]=useState(false);
   const [resumeEditMode,setResumeEditMode]=useState(false);
-  const [artifactWidth,setArtifactWidth]=useState(760);
+  const [artifactWidth,setArtifactWidth]=useState(()=>Math.min(760, Math.max(360, Math.floor(window.innerWidth * 0.42))));
   const [sidebarWidth,setSidebarWidth]=useState(320);
   const [panel,setPanel]=useState<SidePanel>('content');
   const [prompt,setPrompt]=useState('');
@@ -40,19 +40,60 @@ const AgentWorkspace:React.FC=()=>{
   // ChatGPT-style behavior: every new user/assistant message and the loading
   // state keeps the conversation viewport at the newest content. The user can
   // still scroll manually after the update.
+  const chatWasNearBottomRef=useRef(true);
+  const chatScrollMetricsRef=useRef<{scrollHeight:number;scrollTop:number;clientHeight:number}|null>(null);
+
+  const scrollChatToBottom=(behavior:'auto'|'smooth'='auto')=>{
+    const el=chatScrollRef.current;
+    if(!el)return;
+    el.scrollTo({top:Math.max(0,el.scrollHeight-el.clientHeight),behavior});
+  };
+
   useEffect(()=>{
     const el=chatScrollRef.current;
     if(!el)return;
     requestAnimationFrame(()=>{
-      el.scrollTo({top:el.scrollHeight,behavior:'smooth'});
+      scrollChatToBottom('smooth');
     });
   },[messages.length,loading]);
+
+  // Resizing the artifact changes the width of the chat column, which can
+  // reflow long messages and change their height. Keep the conversation
+  // anchored to the same place (normally the bottom, like ChatGPT) instead
+  // of making already-visible text jump out of view.
+  useEffect(()=>{
+    const el=chatScrollRef.current;
+    if(!el)return;
+    requestAnimationFrame(()=>{
+      if(chatWasNearBottomRef.current) {
+        scrollChatToBottom('auto');
+      } else if(chatScrollMetricsRef.current) {
+        const before=chatScrollMetricsRef.current;
+        const oldMax=Math.max(1,before.scrollHeight-before.clientHeight);
+        const ratio=Math.max(0,Math.min(1,before.scrollTop/oldMax));
+        const nextMax=Math.max(0,el.scrollHeight-el.clientHeight);
+        el.scrollTop=nextMax*ratio;
+      }
+    });
+  },[artifactWidth,sidebarWidth]);
+
+  const rememberChatScrollPosition=()=>{
+    const el=chatScrollRef.current;
+    if(!el)return;
+    const distanceFromBottom=el.scrollHeight-el.clientHeight-el.scrollTop;
+    chatWasNearBottomRef.current=distanceFromBottom<80;
+    chatScrollMetricsRef.current={
+      scrollHeight:el.scrollHeight,
+      scrollTop:el.scrollTop,
+      clientHeight:el.clientHeight
+    };
+  };
 
   const resizeChatInput=()=>{
     const el=chatInputRef.current;
     if(!el)return;
     el.style.height='auto';
-    const maxHeight=260;
+    const maxHeight=Math.max(180, Math.min(420, Math.floor(window.innerHeight * 0.45)));
     const next=Math.min(Math.max(el.scrollHeight,34),maxHeight);
     el.style.height=`${next}px`;
     el.style.overflowY=el.scrollHeight>maxHeight?'auto':'hidden';
@@ -94,7 +135,7 @@ const AgentWorkspace:React.FC=()=>{
     const att=attachment?.name;
     setMessages(m=>[...m,{id:crypto.randomUUID(),role:'user',text:instruction,attachment:att}]);
     setPrompt('');
-    requestAnimationFrame(()=>{ if(chatInputRef.current) chatInputRef.current.style.height='34px'; });
+    requestAnimationFrame(()=>{ if(chatInputRef.current){ chatInputRef.current.style.height='34px'; chatInputRef.current.style.overflowY='hidden'; }});
     setLoading(true);
 
     try{
@@ -104,8 +145,7 @@ const AgentWorkspace:React.FC=()=>{
       if(attachment && attachmentKind==='resume'){
         workingResume=await importResumeFromFile(attachment,!attachment.name.toLowerCase().endsWith('.json'));
         importResumeData(workingResume);
-        setResumeOpen(true);
-        setResumeEditMode(false);
+        openArtifact();
 
         // If the user only uploaded a resume and did not ask for an AI change,
         // stop here. The explicit Send action is the import/parse confirmation.
@@ -135,18 +175,12 @@ const AgentWorkspace:React.FC=()=>{
       setHistory(h=>[...h,structuredClone(workingResume)]);
       const next = normalizeParsedResume(result.resumeData as ResumeData, workingResume);
 
-      // The AI agent is NEVER allowed to change the selected template. Keep the
-      // user's exact selection, and keep the uploaded file metadata immutable.
+      // HARD RULE: the uploaded document is immutable metadata. AI responses
+      // are never allowed to replace the selected template or the original
+      // uploaded file. Template changes happen only through TemplateSelector.
       next.template = workingResume.template;
       if (workingResume.originalTemplate) {
-        next.originalTemplate = {
-          ...workingResume.originalTemplate,
-          // The uploaded document stays the original reference. When content is
-          // edited, the preview renders that content in the stored editable
-          // layout without changing the selected template value.
-          tailored: true,
-          editableTemplate: workingResume.originalTemplate.editableTemplate || 'modern-minimal'
-        };
+        next.originalTemplate = structuredClone(workingResume.originalTemplate);
       }
       importResumeData(next);
       setResumeOpen(true);
@@ -156,6 +190,12 @@ const AgentWorkspace:React.FC=()=>{
     }catch(e){
       setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:e instanceof Error?e.message:'Unable to complete request.'}]);
     }finally{setLoading(false);}
+  };
+
+  const openArtifact=()=>{
+    setArtifactWidth(w=>w>24?w:Math.min(760, Math.max(360, Math.floor(window.innerWidth*0.42))));
+    setResumeOpen(true);
+    setResumeEditMode(false);
   };
 
   const undo=()=>{
@@ -168,8 +208,7 @@ const AgentWorkspace:React.FC=()=>{
   const pdf=async()=>{
     const el=document.getElementById('resume-content');
     if(!el){
-      setResumeOpen(true);
-      setResumeEditMode(false);
+      openArtifact();
       toast({title:'Open resume preview first',description:'The Created Resume artifact has been opened. Try PDF again after the preview appears.',variant:'destructive'});
       return;
     }
@@ -196,9 +235,16 @@ const AgentWorkspace:React.FC=()=>{
       const next=s.startWidth-(e.clientX-s.startX);
       // GPT-style artifact: the panel has no artificial 600px floor. It can
       // be dragged very narrow, with the center workspace taking the released space.
-      const min=0;
-      const max=Math.max(min,Math.min(1100,window.innerWidth-140));
-      setArtifactWidth(Math.max(min,Math.min(max,next)));
+      const max=Math.max(0,Math.min(1400,window.innerWidth-80));
+      const clamped=Math.max(0,Math.min(max,next));
+      // ChatGPT-like behavior: dragging the artifact completely left closes it
+      // instead of leaving a unusable sliver. There is no visible minimum width.
+      if(clamped<=24) {
+        setArtifactWidth(0);
+        setResumeOpen(false);
+      } else {
+        setArtifactWidth(clamped);
+      }
     }else{
       const next=s.startWidth+(e.clientX-s.startX);
       setSidebarWidth(Math.max(260,Math.min(420,next)));
@@ -279,7 +325,7 @@ const AgentWorkspace:React.FC=()=>{
           <Button
             size="sm"
             variant={resumeOpen?'secondary':'ghost'}
-            onClick={()=>{setResumeOpen(v=>!v); if(resumeOpen)setResumeEditMode(false);}}
+            onClick={()=>{if(resumeOpen){setResumeOpen(false);setResumeEditMode(false);}else{openArtifact();}}}
             title={resumeOpen?'Close created resume':'Open created resume'}
             aria-label={resumeOpen?'Close created resume':'Open created resume'}
           >
@@ -296,7 +342,7 @@ const AgentWorkspace:React.FC=()=>{
 
       <div className="resume-studio-workspace">
         <section className="resume-chat-column">
-          <div ref={chatScrollRef} className="resume-chat-scroll">
+          <div ref={chatScrollRef} className="resume-chat-scroll" onScroll={rememberChatScrollPosition}>
             <div className="resume-chat-content">
               {messages.map(msg=><div key={msg.id} className={`resume-chat-row ${msg.role==='user'?'user':'assistant'}`}>
                 <div className={`resume-chat-message ${msg.role==='user'?'user-message':'assistant-message'}`}>
@@ -306,7 +352,7 @@ const AgentWorkspace:React.FC=()=>{
                   {msg.analysis?.gaps?.length?<div className="mt-3 text-muted-foreground"><b className="text-foreground">Gaps:</b> {msg.analysis.gaps.join(', ')}</div>:null}
                   {msg.hasResume&&<div className="resume-chat-artifact-link">
                     <div className="min-w-0"><div className="font-medium">Created resume</div><div className="text-xs text-muted-foreground">Open the live artifact on the right. Edits in the artifact are local.</div></div>
-                    <Button size="sm" onClick={()=>{setResumeOpen(true);setResumeEditMode(false)}}>Open</Button>
+                    <Button size="sm" onClick={()=>{openArtifact()}}>Open</Button>
                   </div>}
                 </div>
               </div>)}

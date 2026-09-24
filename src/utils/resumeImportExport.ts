@@ -23,17 +23,41 @@ export async function importResumeFromFile(file: File, useAI = true): Promise<Re
 
   }
   const isPdf = file.name.toLowerCase().endsWith('.pdf');
+  // Always keep a local, source-grounded parse as a safety net. AI extraction
+  // can return a syntactically valid but incomplete object during provider
+  // overload; merging it over the local parse prevents projects, experience,
+  // education or contact fields from disappearing.
+  const text = await extractResumeText(file);
+  if (!text.trim()) throw new Error('No readable text was found in this resume. Scanned/image-only PDFs need OCR before import.');
+  const localData = parseResumeHeuristically(text);
+
   if (useAI && isPdf) {
     const bytes = new Uint8Array(await file.arrayBuffer());
     let binary = '';
     const chunk = 0x8000;
     for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-    const data = await parseResumeWithAI({ pdfBase64: btoa(binary) });
+    let aiData: ResumeData;
+    try {
+      aiData = await parseResumeWithAI({ pdfBase64: btoa(binary) });
+    } catch {
+      aiData = localData;
+    }
+    const data = normalizeParsedResume(aiData, localData);
     return { ...data, template: 'original-upload', originalTemplate: { sourceFileName: file.name, sourceFormat: 'pdf', importedAt: new Date().toISOString(), sourceDataUrl: `data:application/pdf;base64,${btoa(binary)}`, editableTemplate: 'modern-minimal' } };
   }
-  const text = await extractResumeText(file);
-  if (!text.trim()) throw new Error('No readable text was found in this resume. Scanned/image-only PDFs need OCR before import.');
-  const data = useAI ? await parseResumeWithAI({ text }) : parseResumeHeuristically(text);
+
+  let data: ResumeData;
+  if (useAI) {
+    try {
+      const aiData = await parseResumeWithAI({ text });
+      data = normalizeParsedResume(aiData, localData);
+    } catch {
+      data = localData;
+    }
+  } else {
+    data = localData;
+  }
+
   const mime = ext === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'text/plain';
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = '';

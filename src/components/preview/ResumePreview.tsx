@@ -23,9 +23,11 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
     return () => observer.disconnect();
   }, [artifact]);
 
-  const visualTemplate = resumeData.template === 'original-upload' && resumeData.originalTemplate?.tailored
-    ? (resumeData.originalTemplate.editableTemplate || 'modern-minimal')
-    : resumeData.template;
+  // The selected template is authoritative. In particular, AI tailoring must
+  // never silently replace the user's Original Uploaded Resume selection.
+  // Tailored content is still kept in resumeData and can be rendered after the
+  // user explicitly chooses a built-in editable template.
+  const visualTemplate = resumeData.template;
 
   if (visualTemplate === 'original-upload' && resumeData.originalTemplate?.sourceDataUrl) {
     return (
