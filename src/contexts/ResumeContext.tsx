@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
 import { ResumeData, DEFAULT_COLORS, DEFAULT_SECTIONS } from '../types/resume';
 
 interface ResumeState {
@@ -181,8 +181,29 @@ interface ResumeContextType {
 
 const ResumeContext = createContext<ResumeContextType | undefined>(undefined);
 
+const loadPersistedState = (): ResumeState => {
+  if (typeof window === 'undefined') return initialState;
+  try {
+    const raw = window.localStorage.getItem('resume-studio-resume-data');
+    if (!raw) return initialState;
+    const parsed = JSON.parse(raw) as ResumeData;
+    if (!parsed || typeof parsed !== 'object' || !parsed.personalInfo || !Array.isArray(parsed.sections)) return initialState;
+    return { ...initialState, resumeData: parsed };
+  } catch {
+    return initialState;
+  }
+};
+
 export const ResumeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [state, dispatch] = useReducer(resumeReducer, initialState);
+  const [state, dispatch] = useReducer(resumeReducer, initialState, loadPersistedState);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('resume-studio-resume-data', JSON.stringify(state.resumeData));
+    } catch {
+      // Large original PDFs or a browser storage quota should never break editing.
+    }
+  }, [state.resumeData]);
 
   const updatePersonalInfo = (data: Partial<ResumeData['personalInfo']>) => {
     dispatch({ type: 'UPDATE_PERSONAL_INFO', payload: data });

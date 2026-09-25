@@ -432,19 +432,23 @@ html, body, #root {
   pointer-events: auto;
   width: min(760px, 100%);
   min-height: 48px;
-  max-height: 64vh;
+  max-height: min(64vh, 520px);
   margin: 0 auto;
-  padding: 5px 7px 5px 9px;
+  padding: 7px 8px 7px 10px;
   border: 1px solid hsl(var(--border));
   border-radius: 24px;
   background: hsl(var(--card));
   box-shadow: 0 4px 20px rgb(0 0 0 / .10);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .resume-chat-input {
   width: 100%;
   min-height: 34px !important;
-  max-height: 56vh !important;
+  max-height: min(44vh, 360px) !important;
+  flex: 0 1 auto;
   resize: none;
   overflow-y: auto;
   border: 0 !important;
@@ -464,7 +468,12 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 28px;
+  min-height: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid hsl(var(--border) / .7);
 }
 
 .resume-chat-composer-actions button {
@@ -478,11 +487,13 @@ html, body, #root {
 }
 
 .resume-chat-attachment {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
-  max-width: 100%;
-  margin: 1px 0 4px;
+  flex: 0 0 auto;
+  width: fit-content;
+  max-width: min(100%, 520px);
+  margin: 0 2px 3px;
   padding: 4px 8px;
   border-radius: 8px;
   background: hsl(var(--muted));
@@ -558,7 +569,7 @@ html, body, #root {
 }
 
 .resume-artifact-preview {
-  padding: 18px;
+  padding: 8px;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -892,7 +903,8 @@ html, body, #root {
 .resume-artifact-panel { flex-shrink: 0; }
 .resume-chat-composer { overflow: hidden; }
 .resume-chat-input { box-sizing: border-box; }
-.resume-chat-composer-actions { flex: 0 0 32px; }
+.resume-chat-composer-actions { flex: 0 0 34px; }
+.resume-chat-attachment + .resume-chat-input { margin-top: 0; }
 
 /* =========================================================
    AUTOMATION / E2E CONTROL CENTER

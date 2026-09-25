@@ -17,7 +17,7 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   useEffect(() => {
     const el = previewHostRef.current;
     if (!el) return;
-    const update = () => setHostWidth(Math.max(1, el.clientWidth - 36));
+    const update = () => setHostWidth(Math.max(1, el.clientWidth - 16));
     update();
     const observer = new ResizeObserver(update);
     observer.observe(el);
@@ -77,7 +77,7 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   // Keep the artifact document readable at narrow widths. Below ~62% a full A4/Letter
   // page becomes effectively unreadable; the artifact itself can still be resized
   // to any width, while the document viewer scrolls horizontally when necessary.
-  const scale = artifact ? Math.min(1, Math.max(0.62, scaleWidth)) : Math.min(1, scaleWidth, 650 / pageHeight);
+  const scale = artifact ? Math.min(1, Math.max(0.08, scaleWidth)) : Math.min(1, scaleWidth, 650 / pageHeight);
 
   return (
     <div ref={previewHostRef} className="w-full h-full flex items-center justify-center p-2">

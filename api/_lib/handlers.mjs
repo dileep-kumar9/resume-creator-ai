@@ -361,6 +361,13 @@ async function handleAgent(req,res){
     const b=await readBody(req,12_000_000);
     if(!b.resumeData||typeof b.resumeData!=='object') return sendJson(res,400,{error:'Resume data is required.'});
     if(typeof b.instruction!=='string'||b.instruction.trim().length<2) return sendJson(res,400,{error:'Please tell the Resume Agent what you want it to do.'});
+    const requestLooksLikeTailoring=/tailor|job description|\bjd\b|ats|match (?:this|the) (?:role|job)/i.test(b.instruction);
+    if(requestLooksLikeTailoring){
+      const counts={experience:Array.isArray(b.resumeData.experience)?b.resumeData.experience.length:0,projects:Array.isArray(b.resumeData.projects)?b.resumeData.projects.length:0,education:Array.isArray(b.resumeData.education)?b.resumeData.education.length:0,skills:collectSkills(b.resumeData.skills).length};
+      if(counts.experience+counts.projects+counts.education+counts.skills===0){
+        return sendJson(res,422,{error:'The tailoring request did not include a parsed resume. Import the resume first and retry; no empty resume was applied.',resumeCounts:counts});
+      }
+    }
     let referenceText=typeof b.referenceText==='string'?b.referenceText.trim():'';
     let contents=[{parts:[{text:agentPrompt(b.resumeData,b.instruction.trim(),referenceText)}]}];
     // When a PDF reference is supplied, use Gemini's native PDF input so the agent can reason

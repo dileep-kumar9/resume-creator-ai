@@ -16,7 +16,7 @@ type SidePanel='content'|'customize'|'settings'|'templates';
 type ChatItem={id:string;role:'user'|'assistant';text:string;attachment?:string;changes?:string[];analysis?:any;hasResume?:boolean};
 
 const AgentWorkspace:React.FC=()=>{
-  const {state,importResumeData}=useResume();
+  const {state,importResumeData,updateTemplate}=useResume();
   const {toast}=useToast();
   const [sidebarOpen,setSidebarOpen]=useState(true);
   const [resumeOpen,setResumeOpen]=useState(false);
@@ -122,7 +122,7 @@ const AgentWorkspace:React.FC=()=>{
     // Keep the action row (attachment/send) permanently visible. The old
     // textarea could grow almost as tall as the composer itself and push the
     // action row below the clipped bottom edge.
-    const maxHeight=Math.max(160, Math.min(520, Math.floor(window.innerHeight * 0.56)));
+    const maxHeight=Math.max(120, Math.min(360, Math.floor(window.innerHeight * 0.44)));
     const next=Math.min(Math.max(el.scrollHeight,34),maxHeight);
     el.style.height=`${next}px`;
     el.style.overflowY=el.scrollHeight>maxHeight?'auto':'hidden';
@@ -130,7 +130,7 @@ const AgentWorkspace:React.FC=()=>{
 
   useLayoutEffect(()=>{
     resizeChatInput();
-  },[prompt]);
+  },[prompt,attachment]);
 
   const clearAttachment=()=>{
     attachmentRef.current=null; attachmentKindRef.current=null;
@@ -176,7 +176,7 @@ const AgentWorkspace:React.FC=()=>{
     try{
       // A resume upload is parsed only after Send. This prevents sidebar/tab
       // changes and file selection from mutating the live resume automatically.
-      let workingResume=state.resumeData;
+      let workingResume=resumeDataRef.current;
       if(currentAttachment && currentAttachmentKind==='resume'){
         workingResume=await importResumeFromFile(currentAttachment,!currentAttachment.name.toLowerCase().endsWith('.json'));
         importResumeData(workingResume);
@@ -290,11 +290,19 @@ const AgentWorkspace:React.FC=()=>{
       await importFixtureResume('pdf'); check('PDF resume fixture fetched',true);
       await new Promise(r=>setTimeout(r,100));
       await send();
-      await new Promise(r=>setTimeout(r,250));
-      const imported=(window as any).__RESUME_STUDIO_CONTROL__?.snapshot?.() || getSnapshot();
+      const waitForSnapshot=async(predicate:(snapshot:any)=>boolean,timeout=5000)=>{
+        const started=Date.now();
+        while(Date.now()-started<timeout){
+          const snapshot=(window as any).__RESUME_STUDIO_CONTROL__?.snapshot?.() || getSnapshot();
+          if(predicate(snapshot)) return snapshot;
+          await new Promise(r=>setTimeout(r,100));
+        }
+        return (window as any).__RESUME_STUDIO_CONTROL__?.snapshot?.() || getSnapshot();
+      };
+      const imported=await waitForSnapshot((x:any)=>!!x.originalTemplate && (x.resumeCounts.experience>0 || x.resumeCounts.projects>0 || x.resumeCounts.education>0 || x.resumeCounts.skills>0));
       check('Resume import completed',!!imported.originalTemplate);
       check('Original template retained',imported.selectedTemplate==='original-upload',`template=${imported.selectedTemplate}`);
-      check('Imported resume has core sections',imported.resumeCounts.experience>0 || imported.resumeCounts.projects>0 || imported.resumeCounts.education>0,JSON.stringify(imported.resumeCounts));
+      check('Imported resume has complete core sections',imported.resumeCounts.experience>0 && imported.resumeCounts.projects>0 && imported.resumeCounts.education>0 && imported.resumeCounts.skills>0,JSON.stringify(imported.resumeCounts));
       setPanel('templates'); check('Templates panel selectable',true);
       setPanel('customize'); check('Customize panel selectable',true);
       setPanel('settings'); check('Settings panel selectable',true);
@@ -306,11 +314,14 @@ const AgentWorkspace:React.FC=()=>{
       const jd='Job Title: Agent Product Builder\nEnd-to-End Agent Development and applied data science. Work with Python, SQL, data transformation, unstructured data processing, dashboards, anomaly identification and data analytics. Build autonomous AI agents and solve ambiguous technical problems.';
       promptRef.current=jd; setPrompt(jd);
       await new Promise(r=>setTimeout(r,80));
+      const beforeTailor=resumeDataRef.current;
       await send();
-      await new Promise(r=>setTimeout(r,350));
-      const tailoredSnapshot=(window as any).__RESUME_STUDIO_CONTROL__?.snapshot?.() || getSnapshot();
-      check('Resume tailoring through chat completed',tailoredSnapshot.resumeCounts.experience>0 || tailoredSnapshot.resumeCounts.projects>0,JSON.stringify(tailoredSnapshot.resumeCounts));
+      const tailoredSnapshot=await waitForSnapshot((x:any)=>x.resumeCounts.experience>0 && x.resumeCounts.projects>0 && x.resumeCounts.education>0 && x.resumeCounts.skills>0 && x.selectedTemplate==='original-upload',7000);
+      const tailoredData=resumeDataRef.current;
+      check('Resume tailoring through chat completed',tailoredSnapshot.resumeCounts.experience>0 && tailoredSnapshot.resumeCounts.projects>0 && tailoredSnapshot.resumeCounts.education>0 && tailoredSnapshot.resumeCounts.skills>0,JSON.stringify(tailoredSnapshot.resumeCounts));
       check('Tailoring keeps original template',tailoredSnapshot.selectedTemplate==='original-upload',`template=${tailoredSnapshot.selectedTemplate}`);
+      check('Tailoring preserves all imported entries',tailoredSnapshot.resumeCounts.experience>=(beforeTailor.experience?.length||0) && tailoredSnapshot.resumeCounts.projects>=(beforeTailor.projects?.length||0) && tailoredSnapshot.resumeCounts.education>=(beforeTailor.education?.length||0),JSON.stringify(tailoredSnapshot.resumeCounts));
+      check('Tailoring changed editable content',JSON.stringify(tailoredData?.summary||'')!==JSON.stringify(beforeTailor?.summary||'') || JSON.stringify(tailoredData?.experience||[])!==JSON.stringify(beforeTailor?.experience||[]) || JSON.stringify(tailoredData?.projects||[])!==JSON.stringify(beforeTailor?.projects||[]) || JSON.stringify(tailoredData?.skills||{})!==JSON.stringify(beforeTailor?.skills||{}));
       await importFixtureResume('docx'); check('DOCX resume fixture fetched',true);
       await new Promise(r=>setTimeout(r,100)); await send(); await new Promise(r=>setTimeout(r,250));
       const docxSnapshot=(window as any).__RESUME_STUDIO_CONTROL__?.snapshot?.() || getSnapshot();
@@ -405,7 +416,7 @@ const AgentWorkspace:React.FC=()=>{
       setSidebarOpen:(open:boolean)=>setSidebarOpen(!!open), setPrompt:(text:string)=>setPrompt(String(text||'')), clearPrompt:()=>setPrompt(''),
       attachFixtureResume:(format:'pdf'|'docx'='pdf')=>importFixtureResume(format), attachFileBase64, send, toggleEdit:(edit:boolean)=>setResumeEditMode(!!edit), runFullE2E,
       undo, exportPDF:pdf, exportDOCX:docx,
-      selectTemplate:(template:ResumeData['template'])=>{importResumeData({...resumeDataRef.current,template});},
+      selectTemplate:(template:ResumeData['template'])=>{updateTemplate(template);},
       copyMessage:(id:string)=>{const msg=messages.find(m=>m.id===id); if(msg)return copyMessage(msg); throw new Error(`Message not found: ${id}`);},
       getDiagnostics:()=>({snapshot:getSnapshot(),qaResults,runtimeErrors,dom:{chatInput:!!document.querySelector('[data-control=chat-input]'),send:!!document.querySelector('[data-control=send]'),artifact:!!document.querySelector('[aria-label="Created resume artifact"]'),preview:!!document.querySelector('[data-control=preview]'),edit:!!document.querySelector('[data-control=edit]'),copyButtons:document.querySelectorAll('[data-control=copy-message]').length}}),
       click:(selector:string)=>{const el=document.querySelector(selector) as HTMLElement|null;if(!el)throw new Error(`Element not found: ${selector}`);el.click();return true;},
@@ -546,7 +557,7 @@ const AgentWorkspace:React.FC=()=>{
                   <Button size="icon" variant="ghost" onClick={()=>fileRef.current?.click()} title="Attach reference document" aria-label="Attach reference"><Paperclip className="w-4 h-4"/></Button>
                   <Button size="sm" variant="ghost" data-control="upload-resume" onClick={()=>importRef.current?.click()}>Upload resume</Button>
                 </div>
-                <Button size="icon" className="rounded-full resume-send-button" disabled={(!promptRef.current.trim()&&!attachment)||loading} onClick={send} title="Send" aria-label="Send message">
+                <Button size="icon" className="rounded-full resume-send-button" disabled={(!promptRef.current.trim()&&!attachment)||loading} onClick={send} title="Send" aria-label="Send message" data-control="send">
                   {loading?<Loader2 className="w-4 h-4 animate-spin"/>:<Send className="w-4 h-4"/>}
                 </Button>
               </div>
