@@ -93,7 +93,7 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
       >
         <div
           id="resume-content"
-          className="relative print:shadow-none print:rounded-none overflow-hidden"
+          className="relative print:shadow-none print:rounded-none overflow-hidden" data-control="resume-rendered"
           style={{
             width: isA4 ? '210mm' : '8.5in',
             height: isA4 ? '297mm' : '11in',

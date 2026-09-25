@@ -338,7 +338,21 @@ const AgentWorkspace:React.FC=()=>{
       setPanel('content'); openArtifact(); setResumeEditMode(false);
       await new Promise(r=>setTimeout(r,150));
       check('Artifact opened',true,`width=${getSnapshot().artifactWidth}`);
-      check('Artifact renders resume content',Boolean(document.querySelector('#resume-content')) && ((document.querySelector('#resume-content')?.textContent||'').trim().length>80),`contentLength=${(document.querySelector('#resume-content')?.textContent||'').trim().length}`);
+      const waitForArtifactContent=async(timeout=3000)=>{
+        const started=Date.now();
+        while(Date.now()-started<timeout){
+          const root=document.querySelector('[aria-label="Created resume artifact"]');
+          const rendered=root?.querySelector('[data-control=resume-rendered]') as HTMLElement|null;
+          const text=(rendered?.innerText||rendered?.textContent||'').trim();
+          if(text.length>80) return text;
+          await new Promise(r=>setTimeout(r,100));
+        }
+        const root=document.querySelector('[aria-label="Created resume artifact"]');
+        const rendered=root?.querySelector('[data-control=resume-rendered]') as HTMLElement|null;
+        return (rendered?.innerText||rendered?.textContent||'').trim();
+      };
+      const artifactText=await waitForArtifactContent();
+      check('Artifact renders resume content',artifactText.length>80,`contentLength=${artifactText.length}`);
       check('Preview control available',Boolean(document.querySelector('[data-control=preview]')));
       check('Edit control available',Boolean(document.querySelector('[data-control=edit]')));
       setArtifactWidth(Math.max(280,Math.min(720,Math.floor(window.innerWidth*.38)))); check('Artifact resize command accepted',true);
@@ -351,7 +365,7 @@ const AgentWorkspace:React.FC=()=>{
       const beforeTailor=resumeDataRef.current;
       await send();
       const tailoredSnapshot=await waitForSnapshot((x:any)=>x.resumeCounts.experience>0 && x.resumeCounts.projects>0 && x.resumeCounts.education>0 && x.resumeCounts.skills>0 && x.selectedTemplate==='original-upload',7000);
-      const tailoredData=resumeDataRef.current;
+      const tailoredData=(window as any).__RESUME_STUDIO_CONTROL__?.getResumeData?.() || resumeDataRef.current;
       check('Resume tailoring through chat completed',tailoredSnapshot.resumeCounts.experience>0 && tailoredSnapshot.resumeCounts.projects>0 && tailoredSnapshot.resumeCounts.education>0 && tailoredSnapshot.resumeCounts.skills>0,JSON.stringify(tailoredSnapshot.resumeCounts));
       check('Tailoring keeps original template',tailoredSnapshot.selectedTemplate==='original-upload',`template=${tailoredSnapshot.selectedTemplate}`);
       check('Tailoring preserves all imported entries',tailoredSnapshot.resumeCounts.experience>=(beforeTailor.experience?.length||0) && tailoredSnapshot.resumeCounts.projects>=(beforeTailor.projects?.length||0) && tailoredSnapshot.resumeCounts.education>=(beforeTailor.education?.length||0),JSON.stringify(tailoredSnapshot.resumeCounts));

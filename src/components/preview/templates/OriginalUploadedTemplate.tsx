@@ -15,28 +15,67 @@ export const OriginalUploadedTemplate: React.FC<Props> = ({ data }) => {
   const link = (label:string, value?:string) => {
     if (!value) return null;
     const href = /^https?:\/\//i.test(value) ? value : label === 'Email' ? `mailto:${value}` : label === 'Phone' ? `tel:${value.replace(/[^+\d]/g,'')}` : value;
-    return <a href={href} target={/^https?:\/\//i.test(href) ? '_blank' : undefined} rel={/^https?:\/\//i.test(href) ? 'noreferrer' : undefined} className="text-[10px] text-gray-600 hover:text-blue-600 underline-offset-2 hover:underline"><span className="text-emerald-500">●</span> {label}</a>;
+    return <a href={href} target={/^https?:\/\//i.test(href) ? '_blank' : undefined} rel={/^https?:\/\//i.test(href) ? 'noreferrer' : undefined} className="text-[10px] text-gray-700 hover:text-blue-700 underline-offset-2 hover:underline">{label === 'Portfolio' || label === 'LinkedIn' ? label : value}</a>;
   };
   return (
-    <div className="h-full w-full bg-white text-gray-700" style={{fontFamily:'Georgia, serif'}}>
-      <div className="border-b border-blue-100 px-[8%] pt-[5%] pb-[3%]">
-        <div className="text-[22px] font-bold text-blue-600">{personalInfo.fullName || 'Your Name'}</div>
-        <div className="mt-1 text-[11px] text-gray-600">{personalInfo.jobTitle}</div>
-        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-          {link('Email', personalInfo.email)}{link('Phone', personalInfo.phone)}{link('Location', personalInfo.location)}{link('Portfolio', personalInfo.website)}{link('LinkedIn', personalInfo.linkedin)}
+    <div className="w-full bg-white text-black" style={{fontFamily:'Arial, Helvetica, sans-serif', minHeight:'100%'}}>
+      <header className="px-[7%] pt-[6%] pb-[3%]">
+        <div className="text-[19px] font-normal leading-tight">{personalInfo.fullName || 'Your Name'}</div>
+        {personalInfo.jobTitle && <div className="mt-1 text-[12px] leading-tight">{personalInfo.jobTitle}</div>}
+        <div className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] leading-tight">
+          {personalInfo.email && link('Email', personalInfo.email)}
+          {personalInfo.phone && <><span>|</span>{link('Phone', personalInfo.phone)}</>}
+          {personalInfo.location && <><span>|</span>{link('Location', personalInfo.location)}</>}
+          {personalInfo.website && <><span>|</span>{link('Portfolio', personalInfo.website)}</>}
+          {personalInfo.linkedin && <><span>|</span>{link('LinkedIn', personalInfo.linkedin)}</>}
         </div>
-      </div>
-      <div className="grid h-[calc(100%-92px)] grid-cols-[30%_70%] gap-6 px-[8%] py-[2%]">
-        <aside>
-          {education.length>0 && <><Heading>Education</Heading><div className="space-y-2">{education.map(e=><div key={e.id} className="text-[10px] leading-[1.35]"><div className="font-semibold text-gray-600">{e.degree}</div><div>{e.institution}</div><div className="text-gray-400">{e.graduationYear}{e.gpa ? ` · ${e.gpa}`:''}</div></div>)}</div></>}
-          {cats.length>0 && <><Heading>Skills</Heading><div className="space-y-2">{cats.map(c=><div key={c.id}><div className="mb-1 text-[10px] font-semibold text-gray-600">{c.name}</div><div className="flex flex-wrap gap-1">{c.skills.map((x,i)=><span key={i} className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] text-emerald-700">{x}</span>)}</div></div>)}</div></>}
-        </aside>
-        <main>
-          {summary && <><Heading>Profile</Heading><p className="text-[10px] leading-[1.45]">{summary}</p></>}
-          {experience.length>0 && <><Heading>Experience</Heading><div className="space-y-2">{experience.map(e=><div key={e.id}><div className="flex items-start justify-between gap-2"><div><div className="text-[11px] font-bold text-gray-700">{e.jobTitle}</div><div className="text-[10px] text-gray-500">{e.company}{e.location ? ` · ${e.location}`:''}</div></div><div className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] text-blue-600">{e.startDate}{e.endDate ? ` – ${e.endDate}` : ''}</div></div><ul className="ml-3 mt-1 list-disc space-y-0.5 text-[10px] leading-[1.35]">{e.bulletPoints.map((b,i)=><li key={i}>{b}</li>)}</ul></div>)}</div></>}
-          {projects.length>0 && <><Heading>Projects</Heading><div className="space-y-2">{projects.map(p=><div key={p.id}><div className="flex items-start justify-between gap-2"><div className="text-[11px] font-bold text-gray-700">{p.title}</div>{(p.startDate||p.endDate)&&<div className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] text-blue-600">{p.startDate}{p.endDate ? ` – ${p.endDate}`:''}</div>}</div><p className="mt-1 text-[10px] leading-[1.35]">{p.description}</p><div className="mt-1 flex flex-wrap items-center gap-1">{p.technologies.map((x,i)=><span key={i} className="rounded bg-gray-100 px-1 text-[9px] text-gray-600">{x}</span>)}{p.liveUrl&&<a href={p.liveUrl} target="_blank" rel="noreferrer" className="text-[9px] text-blue-600 underline">Portfolio</a>}{p.githubUrl&&<a href={p.githubUrl} target="_blank" rel="noreferrer" className="text-[9px] text-blue-600 underline">Code</a>}</div></div>)}</div></>}
-        </main>
-      </div>
+      </header>
+
+      <main className="px-[7%] pb-[7%]">
+        {summary && <section className="mb-4">
+          <h2 className="mb-1 text-[12px] font-bold uppercase">PROFESSIONAL SUMMARY</h2>
+          <p className="text-[11px] leading-[1.35]">{summary}</p>
+        </section>}
+
+        {experience.length > 0 && <section className="mb-4">
+          <h2 className="mb-1 text-[12px] font-bold uppercase">EXPERIENCE</h2>
+          <div className="space-y-2">
+            {experience.map(e => <div key={e.id} className="text-[11px] leading-[1.35]">
+              <div><span className="font-bold">{e.jobTitle}</span>{e.company ? ` | ${e.company}` : ''}{e.location ? ` | ${e.location}` : ''}{e.startDate || e.endDate ? ` | ${e.startDate}${e.endDate ? ` - ${e.endDate}` : ''}` : ''}</div>
+              {e.bulletPoints.length > 0 && <ul className="ml-4 list-disc space-y-0.5">{e.bulletPoints.map((b,i)=><li key={i}>{b}</li>)}</ul>}
+              {!e.bulletPoints.length && e.description && <p>{e.description}</p>}
+            </div>)}
+          </div>
+        </section>}
+
+        {projects.length > 0 && <section className="mb-4">
+          <h2 className="mb-1 text-[12px] font-bold uppercase">PROJECTS</h2>
+          <div className="space-y-2">
+            {projects.map(p => <div key={p.id} className="text-[11px] leading-[1.35]">
+              <div><span className="font-bold">{p.title}</span>{p.technologies.length ? ` | ${p.technologies.join(', ')}` : ''}{p.startDate || p.endDate ? ` | ${p.startDate}${p.endDate ? ` - ${p.endDate}` : ''}` : ''}</div>
+              {p.description && <p>{p.description}</p>}
+              <div className="flex flex-wrap gap-x-2">
+                {p.liveUrl && <a href={p.liveUrl} target="_blank" rel="noreferrer" className="text-blue-700 underline">Portfolio</a>}
+                {p.githubUrl && <a href={p.githubUrl} target="_blank" rel="noreferrer" className="text-blue-700 underline">Code</a>}
+              </div>
+            </div>)}
+          </div>
+        </section>}
+
+        {education.length > 0 && <section className="mb-4">
+          <h2 className="mb-1 text-[12px] font-bold uppercase">EDUCATION</h2>
+          <div className="space-y-1 text-[11px] leading-[1.35]">
+            {education.map(e => <div key={e.id}>{e.degree}{e.institution ? ` | ${e.institution}` : ''}{e.graduationYear ? ` | ${e.graduationYear}` : ''}{e.gpa ? ` | CGPA ${e.gpa}` : ''}</div>)}
+          </div>
+        </section>}
+
+        {cats.length > 0 && <section>
+          <h2 className="mb-1 text-[12px] font-bold uppercase">SKILLS</h2>
+          <div className="text-[11px] leading-[1.35]">
+            {cats.map((c,i) => <div key={c.id || i}><span className="font-bold">{c.name}:</span> {c.skills.join(', ')}</div>)}
+          </div>
+        </section>}
+      </main>
     </div>
   );
 };

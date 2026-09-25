@@ -64,6 +64,9 @@ FACTUAL INTEGRITY IS ABSOLUTE:
 - Make the tailored version visibly more relevant: use the JD's terminology where it accurately describes existing evidence, improve action verbs, emphasize relevant technical work, and prioritize the strongest matching skills.
 - A JD-tailoring request MUST produce actual rewritten content, not a lightly reformatted copy. Rewrite the professional summary specifically for the target role. Rewrite the candidate's relevant experience bullets and project descriptions using materially different wording while preserving their facts. Do not copy any original bullet verbatim when a truthful rewrite is possible. Reorder existing skills to put the most relevant supported skills first.
 - The tailored summary and rewritten bullets must explicitly connect the candidate's existing evidence to the JD's responsibilities where justified (for example Python, SQL, data analysis, AI/API work, unstructured-data processing, AWS, debugging). Never add unsupported technologies or achievements.
+- Do not invent impact claims. Words such as reduced, increased, improved, accelerated, saved, optimized, automated, led, delivered, achieved, or managed must only be used when the same outcome is explicitly supported by the corresponding source text.
+- Do not introduce new numbers, percentages, performance metrics, clients, business outcomes, production scale, or responsibility claims that are not present in the source resume.
+- For every rewritten experience bullet and project description, preserve the underlying action, object, technology, and outcome from the corresponding source entry; change wording, not facts.
 - Return one complete tailored content result, not generic advice.
 
 OUTPUT JSON MUST MATCH THE PROVIDED SCHEMA.
@@ -190,16 +193,40 @@ function normalizeTailoring(ai) {
   );
   return usable ? out : null;
 }
+function sourceTextForEntry(entry){
+  return [entry?.jobTitle,entry?.company,entry?.description,...(entry?.bulletPoints||[])].filter(Boolean).join(' ');
+}
+function containsNewNumericClaim(text, source){
+  const nums=(text.match(/\b\d+(?:\.\d+)?%?\b/g)||[]);
+  const srcNums=new Set(source.match(/\b\d+(?:\.\d+)?%?\b/g)||[]);
+  return nums.some(n=>!srcNums.has(n));
+}
+function hasUnsupportedOutcomeClaim(text, source){
+  const verbs=['reduced','reducing','increased','increasing','decreased','decreasing','improved','improving','accelerated','accelerating','saved','saving','optimized','optimizing','automated','automating','led','managed','achieved','generated','delivered'];
+  const lower=text.toLowerCase();
+  const sourceLower=source.toLowerCase();
+  return verbs.some(v=>lower.includes(v) && !sourceLower.includes(v));
+}
+function safeTailoredText(text, source, fallback){
+  if(typeof text!=='string'||!text.trim()) return fallback;
+  const clean=text.trim();
+  if(containsNewNumericClaim(clean,source)||hasUnsupportedOutcomeClaim(clean,source)) return fallback;
+  return clean;
+}
+
 function applyTailoring(original,ai){
   const normalized=normalizeTailoring(ai);
   if(!normalized) throw new Error('AI returned JSON, but no usable tailored resume was found.');
   const result=structuredClone(original); const t=normalized.tailoredResume;
-  if(typeof t.summary==='string'&&t.summary.trim()) result.summary=t.summary.trim();
+  if(typeof t.summary==='string'&&t.summary.trim()) {
+    const sourceSummary=[original.summary,...(original.experience||[]).flatMap(e=>e.bulletPoints||[]),(original.projects||[]).map(p=>p.description||'')].filter(Boolean).join(' ');
+    result.summary=safeTailoredText(t.summary,sourceSummary,original.summary);
+  }
   if(Array.isArray(t.experienceBulletPoints)) {
     result.experience=(original.experience||[]).map((x,i)=>({...x,bulletPoints:Array.isArray(t.experienceBulletPoints[i])&&t.experienceBulletPoints[i].length?t.experienceBulletPoints[i].filter(v=>typeof v==='string'&&v.trim()).map(v=>v.trim()):x.bulletPoints}));
   }
   if(Array.isArray(t.projectDescriptions)) {
-    result.projects=(original.projects||[]).map((x,i)=>({...x,description:typeof t.projectDescriptions[i]==='string'&&t.projectDescriptions[i].trim()?t.projectDescriptions[i].trim():x.description}));
+    result.projects=(original.projects||[]).map((x,i)=>({...x,description:typeof t.projectDescriptions[i]==='string'&&t.projectDescriptions[i].trim()?safeTailoredText(t.projectDescriptions[i],sourceTextForEntry(x),x.description):x.description}));
   }
   if(Array.isArray(t.skillsOrder)){
     const originalSkills=collectSkills(original.skills); const lookup=new Map(originalSkills.map(s=>[s.toLowerCase(),s]));
