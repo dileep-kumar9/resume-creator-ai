@@ -89,7 +89,7 @@ const initialResumeData: ResumeData = {
     { id: 'skills', title: 'Technical Skills', visible: true, order: 5 },
     { id: 'custom', title: 'Additional Sections', visible: true, order: 6 }
   ],
-  colors: { ...DEFAULT_COLORS, primary: '#244678', secondary: '#4b5563', text: '#222222', background: '#ffffff' },
+  colors: { ...DEFAULT_COLORS, primary: '#4F8CC9', secondary: '#4b5563', text: '#222222', background: '#ffffff' },
   template: 'original-upload',
   pageFormat: 'letter',
   fontSize: 'medium',

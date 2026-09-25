@@ -14,12 +14,13 @@ export async function exportResumeToPDF(element: HTMLElement, data: ResumeData) 
   const html2pdf = (await import('html2pdf.js')).default;
   const clone = element.cloneNode(true) as HTMLElement;
   clone.style.transform = 'none'; clone.style.width = data.pageFormat === 'a4' ? '210mm' : '8.5in';
-  clone.style.height = data.pageFormat === 'a4' ? '297mm' : '11in'; clone.style.boxShadow = 'none'; clone.style.borderRadius = '0';
+  clone.style.height = 'auto'; clone.style.minHeight = data.pageFormat === 'a4' ? '297mm' : '11in'; clone.style.overflow = 'visible'; clone.style.boxShadow = 'none'; clone.style.borderRadius = '0';
   const wrapper = document.createElement('div'); wrapper.style.position = 'fixed'; wrapper.style.left = '-100000px'; wrapper.style.top = '0'; wrapper.style.width = clone.style.width; wrapper.appendChild(clone); document.body.appendChild(wrapper);
   try {
     await html2pdf().set({
       margin: 0, filename: `${safeName(data.personalInfo.fullName || 'resume')}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: clone.scrollWidth },
+      pagebreak: { mode: ['css', 'legacy'], avoid: ['section', 'h2'] },
       jsPDF: { unit: 'mm', format: data.pageFormat === 'a4' ? 'a4' : 'letter', orientation: 'portrait' },
       enableLinks: true
     }).from(clone).save();

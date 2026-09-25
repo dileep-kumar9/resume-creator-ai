@@ -44,7 +44,7 @@ Rules:
 - Use the JSON schema exactly.
 
 Resume text/content follows:\n${text}`; }
-const tailorSchema={type:'object',properties:{analysis:{type:'object',properties:{summary:{type:'string'},strengths:{type:'array',items:{type:'string'}},gaps:{type:'array',items:{type:'string'}},matchedKeywords:{type:'array',items:{type:'string'}},missingKeywords:{type:'array',items:{type:'string'}},recommendations:{type:'array',items:{type:'string'}}},required:['summary','strengths','gaps','matchedKeywords','missingKeywords','recommendations']},tailoredResume:{type:'object',properties:{summary:{type:'string'},experienceBulletPoints:{type:'array',items:{type:'array',items:{type:'string'}}},projectDescriptions:{type:'array',items:{type:'string'}},skillsOrder:{type:'array',items:{type:'string'}},customSections:{type:'array',items:{type:'object',properties:{title:{type:'string'},content:{type:'string'}},required:['title','content']}}},required:['summary','experienceBulletPoints','projectDescriptions','skillsOrder','customSections']}},required:['analysis','tailoredResume']};
+const tailorSchema={type:'object',properties:{analysis:{type:'object',properties:{summary:{type:'string'},strengths:{type:'array',items:{type:'string'}},gaps:{type:'array',items:{type:'string'}},matchedKeywords:{type:'array',items:{type:'string'}},missingKeywords:{type:'array',items:{type:'string'}},recommendations:{type:'array',items:{type:'string'}}},required:['summary','strengths','gaps','matchedKeywords','missingKeywords','recommendations']},tailoredResume:{type:'object',properties:{summary:{type:'string'},experienceDescriptions:{type:'array',items:{type:'string'}},experienceBulletPoints:{type:'array',items:{type:'array',items:{type:'string'}}},projectDescriptions:{type:'array',items:{type:'string'}},skillsOrder:{type:'array',items:{type:'string'}},customSections:{type:'array',items:{type:'object',properties:{title:{type:'string'},content:{type:'string'}},required:['title','content']}}},required:['summary','experienceDescriptions','experienceBulletPoints','projectDescriptions','skillsOrder','customSections']}},required:['analysis','tailoredResume']};
 function compactResume(r){return {summary:r.summary||'',experience:(r.experience||[]).map(e=>({jobTitle:e.jobTitle,company:e.company,location:e.location,startDate:e.startDate,endDate:e.endDate,current:e.current,description:e.description||'',bulletPoints:e.bulletPoints||[]})),projects:(r.projects||[]).map(p=>({title:p.title,description:p.description,technologies:p.technologies||[],liveUrl:p.liveUrl||'',githubUrl:p.githubUrl||''})),skills:collectSkills(r.skills),education:r.education||[],customSections:(r.customSections||[]).filter(s=>s.visible!==false).map(s=>({title:s.title,content:s.content}))};}
 function tailorPrompt(resumeData,jd){return `Act as a senior resume analyst and ATS resume writer, working like a conversational resume editor. Analyze the candidate against the job description and then create a genuinely tailored version of the existing resume.
 
@@ -61,7 +61,9 @@ FACTUAL INTEGRITY IS ABSOLUTE:
 - Do not manufacture financial, ML, Rust, Java, distributed-systems, forecasting, anomaly-detection, optimization, reconciliation, or other JD experience when the resume does not support it. Mention unsupported requirements only in analysis.gaps.
 - Make the result meaningfully tailored through prioritization and precise phrasing, not keyword stuffing. Write a concise, role-specific summary grounded in the strongest evidence. Use JD terminology only when it is an accurate description of that evidence.
 - Keep all original skills; reorder them by relevance, but never remove skills or add JD-only skills. Do not change candidate identity, job titles, employers, dates, education, project names, technologies, URLs, or template.
+- For EACH experience entry, return an experienceDescriptions item in the same order. Rewrite the existing description only when it contains source facts not already expressed in bullets; otherwise return the original description unchanged.
 - For each experience entry, return one rewritten bullet for each source bullet in the same order. If a bullet cannot be improved without adding assumptions, preserve its meaning with a conservative rewrite.
+- For EACH project, return one rewritten projectDescriptions item in the same order. Make the relevance clear through precise wording, but never turn an existing project into a different type of product or claim unsupported outcomes.
 - Return a complete tailored content result plus specific strengths, gaps, and recommendations. Avoid generic claims such as “results-driven”, “proven ability”, “measurable impact”, or “successfully deployed” unless directly supported.
 
 OUTPUT JSON MUST MATCH THE PROVIDED SCHEMA.
@@ -180,6 +182,8 @@ function normalizeTailoring(ai) {
   const out = { analysis, tailoredResume: {} };
   const tr = out.tailoredResume;
   tr.summary = typeof t.summary === 'string' ? t.summary : '';
+  tr.experienceDescriptions = Array.isArray(t.experienceDescriptions) ? t.experienceDescriptions :
+    Array.isArray(t.experience) ? t.experience.map(e => typeof e?.description === 'string' ? e.description : '') : [];
   tr.experienceBulletPoints = Array.isArray(t.experienceBulletPoints) ? t.experienceBulletPoints :
     Array.isArray(t.experience) ? t.experience.map(e => Array.isArray(e?.bulletPoints) ? e.bulletPoints : (Array.isArray(e?.bullets) ? e.bullets : [])) : [];
   tr.projectDescriptions = Array.isArray(t.projectDescriptions) ? t.projectDescriptions :
@@ -192,6 +196,7 @@ function normalizeTailoring(ai) {
   // a provider omitted an empty optional section.
   const usable = Boolean(
     tr.summary.trim() ||
+    tr.experienceDescriptions.some(x => typeof x === 'string' && x.trim()) ||
     tr.experienceBulletPoints.some(x => Array.isArray(x) && x.length) ||
     tr.projectDescriptions.some(x => typeof x === 'string' && x.trim()) ||
     tr.skillsOrder.length ||
@@ -247,8 +252,11 @@ function applyTailoring(original,ai,jobDescription=''){
       const proposed=t.experienceBulletPoints[i];
       // A model must not silently delete, add, or merge a source bullet.
       const valid=Array.isArray(proposed) && proposed.length === (x.bulletPoints||[]).length && proposed.every(v=>typeof v==='string'&&v.trim());
-      return {...x,bulletPoints:valid?proposed.map(v=>v.trim()):x.bulletPoints};
+      const proposedDescription=Array.isArray(t.experienceDescriptions)?t.experienceDescriptions[i]:'';
+      return {...x,description:typeof proposedDescription==='string'&&proposedDescription.trim()?proposedDescription.trim():x.description,bulletPoints:valid?proposed.map(v=>v.trim()):x.bulletPoints};
     });
+  } else if(Array.isArray(t.experienceDescriptions) && t.experienceDescriptions.length === (original.experience||[]).length) {
+    result.experience=(original.experience||[]).map((x,i)=>({...x,description:typeof t.experienceDescriptions[i]==='string'&&t.experienceDescriptions[i].trim()?t.experienceDescriptions[i].trim():x.description}));
   }
   if(Array.isArray(t.projectDescriptions)) {
     result.projects=(original.projects||[]).map((x,i)=>({...x,description:typeof t.projectDescriptions[i]==='string'&&t.projectDescriptions[i].trim()?t.projectDescriptions[i].trim():x.description}));

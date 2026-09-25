@@ -47,16 +47,43 @@ export async function importResumeFromFile(file: File, useAI = true): Promise<Re
     // Merge each core collection from the local text parse when the AI result
     // omitted it. This is deliberately additive: AI can improve fields, but it
     // cannot erase factual source entries.
+    const key = (value: unknown) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const mergeEntries = <T,>(aiEntries: T[], localEntries: T[], identity: (entry: T) => string): T[] => {
+      const merged = [...(aiEntries || [])];
+      const seen = new Set(merged.map(entry => key(identity(entry))).filter(Boolean));
+      for (const entry of localEntries || []) {
+        const id = key(identity(entry));
+        if (id && !seen.has(id)) { merged.push(entry); seen.add(id); }
+      }
+      return merged;
+    };
+    const aiSkills = data.skills.mode === 'simple' ? data.skills.simple : data.skills.categorized.flatMap(c => c.skills);
+    const localSkills = localData.skills.mode === 'simple' ? localData.skills.simple : localData.skills.categorized.flatMap(c => c.skills);
+    const mergedSkills = [...aiSkills];
+    const skillSeen = new Set(mergedSkills.map(key));
+    for (const skill of localSkills) if (!skillSeen.has(key(skill))) { mergedSkills.push(skill); skillSeen.add(key(skill)); }
     data = {
       ...data,
-      experience: data.experience.length ? data.experience : localData.experience,
-      projects: data.projects.length ? data.projects : localData.projects,
-      education: data.education.length ? data.education : localData.education,
-      skills: (data.skills.simple.length || data.skills.categorized.length) ? data.skills : localData.skills,
+      experience: mergeEntries(data.experience, localData.experience, (x: any) => `${x.jobTitle} ${x.company}`),
+      projects: mergeEntries(data.projects, localData.projects, (x: any) => x.title),
+      education: mergeEntries(data.education, localData.education, (x: any) => `${x.degree} ${x.institution}`),
+      skills: data.skills.mode === 'simple'
+        ? { ...data.skills, simple: mergedSkills }
+        : data.skills.categorized.length
+          ? { ...data.skills, categorized: (() => { const categories = data.skills.categorized.map(c => ({ ...c, skills: [...c.skills] })); const seen = new Set(categories.flatMap(c => c.skills).map(key)); const missing = localSkills.filter(skill => !seen.has(key(skill))); if (categories.length) categories[0].skills.push(...missing); return categories; })() }
+          : localData.skills,
       summary: data.summary || localData.summary,
       personalInfo: { ...localData.personalInfo, ...data.personalInfo, fullName: data.personalInfo.fullName || localData.personalInfo.fullName, jobTitle: data.personalInfo.jobTitle || localData.personalInfo.jobTitle, email: data.personalInfo.email || localData.personalInfo.email, phone: data.personalInfo.phone || localData.personalInfo.phone, location: data.personalInfo.location || localData.personalInfo.location, website: data.personalInfo.website || localData.personalInfo.website, linkedin: data.personalInfo.linkedin || localData.personalInfo.linkedin }
     };
-    return { ...data, template: 'original-upload', originalTemplate: { sourceFileName: file.name, sourceFormat: 'pdf', importedAt: new Date().toISOString(), sourceDataUrl: `data:application/pdf;base64,${btoa(binary)}`, editableTemplate: 'modern-minimal' } };
+    return {
+      ...data,
+      colors: { ...data.colors, primary: '#4F8CC9', secondary: '#4b5563', text: '#222222', background: '#ffffff' },
+      fontFamily: 'Helvetica',
+      fontSize: 'medium',
+      pageFormat: 'letter',
+      template: 'original-upload',
+      originalTemplate: { sourceFileName: file.name, sourceFormat: 'pdf', importedAt: new Date().toISOString(), sourceDataUrl: `data:application/pdf;base64,${btoa(binary)}`, editableTemplate: 'modern-minimal' }
+    };
   }
 
   let data: ResumeData;

@@ -13,16 +13,23 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   const { resumeData } = state;
   const previewHostRef = useRef<HTMLDivElement>(null);
   const [hostWidth, setHostWidth] = useState(500);
+  const [contentHeight, setContentHeight] = useState(1056);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = previewHostRef.current;
     if (!el) return;
     const update = () => setHostWidth(Math.max(1, el.clientWidth - 16));
     update();
-    const observer = new ResizeObserver(update);
+    const observer = new ResizeObserver(() => {
+      update();
+      if (contentRef.current) setContentHeight(Math.max(1, contentRef.current.scrollHeight));
+    });
     observer.observe(el);
+    if (contentRef.current) observer.observe(contentRef.current);
+    requestAnimationFrame(() => { if (contentRef.current) setContentHeight(Math.max(1, contentRef.current.scrollHeight)); });
     return () => observer.disconnect();
-  }, [artifact]);
+  }, [artifact, resumeData]);
 
   // The selected template is authoritative. In particular, AI tailoring must
   // never silently replace the user's Original Uploaded Resume selection.
@@ -64,10 +71,11 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   // content when the artifact was resized.
   const scale = scaleWidth;
   const outerWidth = artifact ? Math.max(220, Math.floor(containerWidth)) : Math.floor(pageWidth * scale);
-  const outerHeight = artifact ? Math.ceil(pageHeight * scale) : Math.floor(pageHeight * scale);
+  const measuredContentHeight = Math.max(pageHeight, contentHeight);
+  const outerHeight = Math.ceil(measuredContentHeight * scale);
 
   return (
-    <div ref={previewHostRef} className="w-full h-full flex items-start justify-center p-2" style={{overflowX: artifact ? 'hidden' : 'visible'}}>
+    <div ref={previewHostRef} className="w-full h-full flex items-start justify-center p-2" style={{overflowX: artifact ? 'hidden' : 'visible', overflowY: 'visible'}}>
       <div
         className="bg-white rounded-lg shadow-xl origin-top-left"
         style={{
@@ -75,18 +83,20 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
           height: outerHeight,
           maxWidth: '100%',
           flex: '0 0 auto',
-          overflow: 'hidden'
+          overflow: 'visible'
         }}
       >
         <div
           id="resume-content"
-          className="relative print:shadow-none print:rounded-none overflow-hidden" data-control="resume-rendered"
+          ref={contentRef}
+          className="relative print:shadow-none print:rounded-none" data-control="resume-rendered"
           style={{
             width: isA4 ? '210mm' : '8.5in',
-            height: isA4 ? '297mm' : '11in',
-            fontSize: artifact ? `${Math.max(11, 11 / scale)}px` : '11px',
+            minHeight: isA4 ? '297mm' : '11in',
+            height: 'auto',
+            fontSize: `${resumeData.fontSize === 'small' ? 10.5 : resumeData.fontSize === 'large' ? 12.5 : 11}px`,
             lineHeight: '1.35',
-            fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+            fontFamily: `${resumeData.fontFamily || 'Helvetica'}, Arial, Helvetica, sans-serif`,
             padding: '0.75in',
             color: '#1f2937',
             boxSizing: 'border-box',

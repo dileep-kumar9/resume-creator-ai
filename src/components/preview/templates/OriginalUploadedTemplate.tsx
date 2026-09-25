@@ -18,7 +18,7 @@ export const OriginalUploadedTemplate: React.FC<Props> = ({ data }) => {
   const sectionFontSize = bodyFontSize * (11 / 9.2);
   const contactFontSize = bodyFontSize * (9.5 / 9.2);
   const titleFontSize = bodyFontSize * (10.5 / 9.2);
-  const headingColor = data.colors.primary || '#244678';
+  const headingColor = data.colors.primary || '#4F8CC9';
 
   const visible = new Set(
     sections.filter(section => section.visible).map(section => section.id)
@@ -42,7 +42,7 @@ export const OriginalUploadedTemplate: React.FC<Props> = ({ data }) => {
   };
 
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <section className="mb-[13px]">
+    <section className="mb-[10px] break-inside-avoid">
       <h2 className="mb-[7px] border-b pb-[4px] text-[12px] font-bold uppercase leading-none" style={{ color: headingColor, borderColor: headingColor, fontSize: `${sectionFontSize}px` }}>
         {title}
       </h2>
@@ -63,7 +63,7 @@ export const OriginalUploadedTemplate: React.FC<Props> = ({ data }) => {
       }}
     >
       <header className="text-center pb-[10px]">
-        <h1 className="m-0 font-bold leading-[1.05]" style={{ fontSize: '24px' }}>
+        <h1 className="m-0 font-bold leading-[1.05]" style={{ fontSize: '24px', color: headingColor }}>
           {personalInfo.fullName || 'Your Name'}
         </h1>
 
