@@ -214,9 +214,7 @@ function localTailorResume(original, jobDescription) {
 
   const originalSummary = original.summary || '';
   const focus = keywordSet.slice(0, 6).join(', ');
-  result.summary = focus
-    ? `${originalSummary.replace(/\s+/g, ' ').trim()} Brings hands-on experience relevant to ${focus}, with a focus on technical problem solving, data handling, and clear delivery of practical solutions.`
-    : `${originalSummary.replace(/\s+/g, ' ').trim()} Brings hands-on technical problem-solving experience and a strong ability to translate existing technical work into practical, role-relevant outcomes.`;
+  result.summary = originalSummary;
 
   result.experience = (original.experience || []).map((entry) => ({
     ...entry,
@@ -317,7 +315,7 @@ SUPPORTED OPERATIONS (may be combined):
 - follow-up instructions such as “that project”, “undo that”, “make it shorter”, “keep everything else unchanged”
 
 INTENT RULES:
-1. ANALYZE means inspect and report; do NOT modify resumeData unless the user explicitly asks to modify it.
+1. ANALYZE means inspect and report only. Never rewrite, improve, reorder, shorten, or otherwise modify resumeData for an analysis request. Return the current resumeData unchanged.
 2. TAILOR means actually rewrite relevant content for the supplied JD; it is not a synonym for “analyze”.
 3. GENERATE means construct a complete resume from supplied facts. Never invent missing facts.
 4. EDIT means apply the requested edit and preserve everything else.
@@ -399,6 +397,9 @@ ${JSON.stringify(Array.isArray(conversation) ? conversation.slice(-12) : [])}
 CURRENT RESUME:
 ${JSON.stringify({...resumeData,originalTemplate:resumeData.originalTemplate?{sourceFileName:resumeData.originalTemplate.sourceFileName,sourceFormat:resumeData.originalTemplate.sourceFormat}:undefined})}
 
+DETECTED OPERATION:
+${inferIntent(instruction, true, Boolean(referenceText))}
+
 USER INSTRUCTION:
 ${instruction}
 
@@ -408,9 +409,21 @@ ${referenceText || '(none)'}
 Return JSON only.`;
 }
 
-function sanitizeAgentResume(original, candidate, instructionForSanitize=''){
+function sanitizeAgentResume(original, candidate, instructionForSanitize='', inferredIntent='EDIT_RESUME'){
   const out=structuredClone(original);
   if(!candidate || typeof candidate!=='object') return out;
+  const createMode=['CREATE_FROM_SCRATCH','GENERATE_RESUME'].includes(inferredIntent) && !((original.experience||[]).length+(original.projects||[]).length+(original.education||[]).length+collectSkills(original.skills).length);
+  if(createMode){
+    const generated=structuredClone(candidate);
+    generated.personalInfo={...structuredClone(original.personalInfo),...(candidate.personalInfo||{})};
+    generated.sections=Array.isArray(candidate.sections)?candidate.sections:structuredClone(original.sections);
+    generated.colors=candidate.colors||structuredClone(original.colors);
+    generated.template=candidate.template||original.template;
+    generated.pageFormat=candidate.pageFormat||original.pageFormat;
+    generated.fontSize=candidate.fontSize||original.fontSize;
+    generated.fontFamily=candidate.fontFamily||original.fontFamily;
+    return generated;
+  }
   const keep=(v,f)=>v===undefined?f:v;
   // AI may change editable content, ordering and design, but immutable factual identity fields
   // are restored from the current resume unless the user explicitly edits them in the editor.
@@ -447,12 +460,88 @@ function looksLikeJobDescription(value='') {
   return text.length>=500 && signals.filter(re=>re.test(text)).length>=2;
 }
 
+
+function resumeText(r){
+  return [r?.summary||'', ...(r?.experience||[]).flatMap(e=>[e.jobTitle,e.company,e.description,...(e.bulletPoints||[])]), ...(r?.projects||[]).flatMap(p=>[p.title,p.description,...(p.technologies||[])]), ...(r?.education||[]).flatMap(e=>[e.degree,e.institution,e.honors]), ...collectSkills(r?.skills)].filter(Boolean).join(' ');
+}
+function buildLocalAnalysis(resume, instruction, jd=''){
+  const skills=collectSkills(resume?.skills);
+  const text=resumeText(resume).toLowerCase();
+  const target=String(jd||instruction||'');
+  const keywords=extractKeywords(target);
+  const matched=keywords.filter(k=>text.includes(k.toLowerCase()));
+  const missing=keywords.filter(k=>!text.includes(k.toLowerCase()));
+  const strengths=[];
+  if(skills.length) strengths.push(`The resume lists ${skills.length} skills, including ${skills.slice(0,8).join(', ')}.`);
+  if((resume?.experience||[]).length) strengths.push(`It contains ${(resume.experience||[]).length} experience ${resume.experience.length===1?'entry':'entries'} with source-backed responsibilities.`);
+  if((resume?.projects||[]).length) strengths.push(`It contains ${(resume.projects||[]).length} project ${(resume.projects||[]).length===1?'example':'examples'} that can be used as evidence.`);
+  if((resume?.education||[]).length) strengths.push(`Education information is present and can be verified directly from the source resume.`);
+  const gaps=[];
+  if(!resume?.summary?.trim()) gaps.push('No professional summary is currently present.');
+  if(!skills.length) gaps.push('No structured skills were extracted.');
+  if(jd && missing.length) gaps.push(`The supplied job description mentions ${missing.slice(0,10).join(', ')}, which are not evidenced in the current resume.`);
+  return {summary: jd ? `Compared the current resume with the supplied job description. ${matched.length} supported keyword(s) were found and ${missing.length} JD keyword(s) were not evidenced.` : `Reviewed the current resume without changing it. It contains ${(resume?.experience||[]).length} experience entries, ${(resume?.projects||[]).length} projects, ${(resume?.education||[]).length} education entries, and ${skills.length} skills.`,strengths,gaps,matchedKeywords:matched,missingKeywords:missing,recommendations:[jd?'Prioritize supported requirements in the summary, experience bullets, projects, and skill order.':'Use the resume evidence as the source of truth and make changes only when requested.']};
+}
+function localEditResume(original,instruction,intent){
+  const out=structuredClone(original); const t=String(instruction||'').trim();
+  if(intent==='SHORTEN_RESUME'){
+    out.summary=(out.summary||'').split(/(?<=[.!?])\s+/).slice(0,2).join(' ');
+    out.experience=(out.experience||[]).map(e=>({...e,bulletPoints:(e.bulletPoints||[]).slice(0,4)}));
+    return out;
+  }
+  if(intent==='DESIGN') return out;
+  if(intent==='ATS_OPTIMIZE'){
+    out.summary=(out.summary||'').trim();
+    const skills=collectSkills(out.skills); if(out.skills?.mode==='simple') out.skills={...out.skills,simple:[...skills].sort((a,b)=>a.localeCompare(b))};
+    return out;
+  }
+  const m=t.match(/(?:summary|professional summary)\s*(?:to|as|:)?\s*["“](.+?)["”]$/i);
+  if(m){out.summary=m[1].trim();return out;}
+  return out;
+}
+function buildLocalTailoredResume(original, instruction){
+  const out=structuredClone(original); const jd=String(instruction||''); const source=resumeText(original).toLowerCase();
+  const keywords=extractKeywords(jd); const supported=collectSkills(original.skills); const matched=keywords.filter(k=>supported.some(s=>s.toLowerCase()===k.toLowerCase()) || source.includes(k.toLowerCase()));
+  const title=jd.match(/(?:job title|role|position)\s*[:\-]\s*([^\n,.;]+)/i)?.[1]?.trim();
+  const focus=[...new Set(matched.map(k=>supported.find(s=>s.toLowerCase()===k.toLowerCase())||k))].slice(0,6);
+  if(focus.length){
+    const base=(original.summary||'').trim();
+    const prefix=title?`${title} candidate with experience in ${focus.join(', ')}.`:`Candidate with experience in ${focus.join(', ')}.`;
+    out.summary=base ? `${prefix} ${base}` : prefix;
+    if(out.skills?.mode==='simple') out.skills={...out.skills,simple:[...focus,...supported.filter(s=>!focus.some(f=>f.toLowerCase()===s.toLowerCase()))]};
+  }
+  return out;
+}
+
+function inferIntent(instruction, hasResume=true, hasReference=false) {
+  const t=String(instruction||'').trim().toLowerCase();
+  if (/\b(undo|revert|go back)\b/.test(t)) return 'UNDO';
+  if (/\b(analy[sz]e|analysis|review|critique|evaluate|what(?:'s| is) wrong|weakness|strengths?|gaps?)\b/.test(t) && !/\b(tailor|rewrite|edit|change|generate|create|remove|add)\b/.test(t)) {
+    return /\b(job description|jd|job posting|requirements)\b/.test(t) ? 'ANALYZE_JD' : 'ANALYZE_RESUME';
+  }
+  if (/\b(compare|match|fit)\b/.test(t) && /\b(resume|cv)\b/.test(t) && /\b(jd|job description|job|role)\b/.test(t)) return 'COMPARE_RESUME_JD';
+  if (/\b(tailor|customi[sz]e|optimi[sz]e)\b/.test(t) && /\b(resume|cv|job|role|jd|ats)\b/.test(t)) return 'TAILOR_RESUME';
+  if (/\b(ats|applicant tracking)\b/.test(t) && !/\b(analy[sz]e|analysis|score)\b/.test(t)) return 'ATS_OPTIMIZE';
+  if (/\b(one page|1 page|single page|shorten|compact|condense)\b/.test(t)) return 'SHORTEN_RESUME';
+  if (/\b(expand|elaborate|add detail|more detail)\b/.test(t)) return 'EXPAND_RESUME';
+  if (/\b(template|layout|design|font|color|colour|format|spacing)\b/.test(t) && !/\b(summary|bullet|experience|project|skill)\b/.test(t)) return 'DESIGN';
+  if (/\b(add|include)\b/.test(t)) return 'ADD_CONTENT';
+  if (/\b(remove|delete|drop)\b/.test(t)) return 'REMOVE_CONTENT';
+  if (/\b(reorder|move|prioriti[sz]e)\b/.test(t)) return 'REORDER_CONTENT';
+  if (/\b(rewrite|rephrase|polish|improve|fix|change|edit|update)\b/.test(t)) return 'EDIT_RESUME';
+  if (/\b(generate|create|build|make)\b/.test(t) && /\b(resume|cv)\b/.test(t)) return hasResume ? 'GENERATE_RESUME' : 'CREATE_FROM_SCRATCH';
+  if (/\b(question|why|how|what)\b/.test(t)) return 'QUESTION';
+  if (hasReference && /\b(reference|look like|style|similar)\b/.test(t)) return 'REFERENCE_STYLE';
+  return 'EDIT_RESUME';
+}
+
 async function handleAgent(req,res){
   try{
     const b=await readBody(req,12_000_000);
-    if(!b.resumeData||typeof b.resumeData!=='object') return sendJson(res,400,{error:'Resume data is required.'});
+    if(!b.resumeData||typeof b.resumeData!=='object') b.resumeData={personalInfo:{fullName:'',jobTitle:'',email:'',phone:'',location:'',website:'',linkedin:'',github:'',birthDate:''},summary:'',experience:[],education:[],projects:[],skills:{mode:'simple',simple:[],categorized:[]},customSections:[],sections:[],colors:{primary:'#262626',secondary:'#444444',accent:'#262626',text:'#222222',background:'#ffffff'},template:'modern-minimal',pageFormat:'a4',fontSize:'medium',fontFamily:'Arial'};
     if(typeof b.instruction!=='string'||b.instruction.trim().length<2) return sendJson(res,400,{error:'Please tell the Resume Agent what you want it to do.'});
-    const requestLooksLikeTailoring=looksLikeJobDescription(b.instruction);
+    const inferredIntent=inferIntent(b.instruction, ((b.resumeData.experience||[]).length+(b.resumeData.projects||[]).length+(b.resumeData.education||[]).length+collectSkills(b.resumeData.skills).length)>0, Boolean(b.referenceText||b.referencePdfBase64));
+    const requestLooksLikeTailoring=inferredIntent==='TAILOR_RESUME';
     if(requestLooksLikeTailoring){
       const counts={experience:Array.isArray(b.resumeData.experience)?b.resumeData.experience.length:0,projects:Array.isArray(b.resumeData.projects)?b.resumeData.projects.length:0,education:Array.isArray(b.resumeData.education)?b.resumeData.education.length:0,skills:collectSkills(b.resumeData.skills).length};
       if(counts.experience+counts.projects+counts.education+counts.skills===0){
@@ -467,7 +556,7 @@ async function handleAgent(req,res){
     if(hasPdf){
       contents=[{parts:[{inlineData:{mimeType:'application/pdf',data:b.referencePdfBase64}},{text:agentPrompt(b.resumeData,b.instruction.trim(),referenceText+'\n[The attached PDF is the visual reference. Inspect its layout/style as well as its text. Use it only as a design reference unless the user explicitly asks for factual extraction.]',b.conversation)}]}];
     }
-    const requestedTailor=looksLikeJobDescription(b.instruction);
+    const requestedTailor=inferredIntent==='TAILOR_RESUME';
     const contentFingerprint=x=>JSON.stringify({jobTitle:x?.personalInfo?.jobTitle||'',summary:x?.summary||'',experience:(x?.experience||[]).map(e=>e.bulletPoints||[]),projects:(x?.projects||[]).map(p=>p.description||''),skills:collectSkills(x?.skills)});
 
     // JD tailoring gets a dedicated resume-writing pass instead of relying on the
@@ -495,9 +584,15 @@ async function handleAgent(req,res){
         console.warn('AI tailoring providers unavailable; using safe local tailoring fallback:', providerError?.message || providerError);
       }
       if(!tailoredResume || contentFingerprint(tailoredResume)===contentFingerprint(b.resumeData)){
-        // Do not claim success with a keyword-appending fallback. A genuine
-        // tailoring result must contain a substantive, provider-generated rewrite.
-        throw Object.assign(new Error('The AI providers did not return a usable tailored resume. Your original resume was left unchanged. Please retry in a moment.'),{status:502});
+        // If the provider returns the source unchanged, do not show the same
+        // stacked resume as if tailoring succeeded. Apply a deterministic,
+        // evidence-only tailoring pass so the operation still has a visible,
+        // truthful effect when the AI provider is unavailable or too conservative.
+        tailoredResume=buildLocalTailoredResume(b.resumeData,b.instruction.trim());
+        fallbackUsed=true;
+      }
+      if(contentFingerprint(tailoredResume)===contentFingerprint(b.resumeData)){
+        return sendJson(res,422,{error:'I could not make a truthful change from the supplied job description. The original resume was left unchanged.',analysis:buildLocalAnalysis(b.resumeData,b.instruction.trim(),b.instruction.trim())});
       }
       const a=tailoredResult?.data?.analysis||{
         summary:'Applied a factual local tailoring pass because the external AI providers did not return a usable result.',
@@ -522,8 +617,24 @@ async function handleAgent(req,res){
       : await generateWithFallback(contents,agentSchema,{primary:'groq',timeoutMs:45000,includeGeminiFallback:true});
     const raw=result.data||{};
     const candidate=raw.resumeData||raw.tailoredResume||raw.resume||raw.result?.resumeData||raw.data?.resumeData;
-    const safeResume=sanitizeAgentResume(b.resumeData,candidate,b.instruction.trim());
-    sendJson(res,200,{resumeData:safeResume,intent:raw.intent||'edit',message:raw.message||'Resume updated.',analysis:raw.analysis||{},changes:Array.isArray(raw.changes)?raw.changes:[],provider:result.provider,model:result.model});
+    const analysisOnly=['ANALYZE_RESUME','ANALYZE_JD','COMPARE_RESUME_JD','QUESTION'].includes(inferredIntent);
+    let safeResume;
+    let analysis=raw.analysis||{};
+    let changes=Array.isArray(raw.changes)?raw.changes:[];
+    if(analysisOnly){
+      safeResume=structuredClone(b.resumeData);
+      if(!analysis.summary && !analysis.strengths?.length && !analysis.gaps?.length) analysis=buildLocalAnalysis(b.resumeData,b.instruction.trim(),inferredIntent==='ANALYZE_JD'?b.instruction.trim():'');
+      changes=[];
+    } else {
+      safeResume=sanitizeAgentResume(b.resumeData,candidate,b.instruction.trim(),inferredIntent);
+      if(['EDIT_RESUME','SHORTEN_RESUME','ATS_OPTIMIZE','DESIGN'].includes(inferredIntent) && JSON.stringify(safeResume)===JSON.stringify(b.resumeData)){
+        const local=localEditResume(b.resumeData,b.instruction.trim(),inferredIntent);
+        if(JSON.stringify(local)!==JSON.stringify(b.resumeData)) safeResume=local;
+      }
+      if(inferredIntent==='TAILOR_RESUME' && JSON.stringify(safeResume)===JSON.stringify(b.resumeData)) safeResume=buildLocalTailoredResume(b.resumeData,b.instruction.trim());
+      if(inferredIntent==='TAILOR_RESUME' && JSON.stringify(safeResume)===JSON.stringify(b.resumeData)) return sendJson(res,422,{error:'I could not make a truthful change from the supplied job description. The original resume was left unchanged.',analysis:buildLocalAnalysis(b.resumeData,b.instruction.trim(),b.instruction.trim())});
+    }
+    sendJson(res,200,{resumeData:safeResume,intent:raw.intent||inferredIntent,message:raw.message|| (analysisOnly?'Analysis completed without changing the resume.':inferredIntent==='TAILOR_RESUME'?'Resume tailored to the supplied job description.':'Resume updated according to the requested operation.'),analysis,changes:analysisOnly?[]:changes,provider:result.provider,model:result.model});
   }catch(e){console.error('Resume agent error:',e);sendJson(res,e.status||500,{error:e.message||'Resume Agent failed.'});}
 }
 

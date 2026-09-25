@@ -165,7 +165,7 @@ const AgentWorkspace:React.FC=()=>{
     const hasAttachment=Boolean(currentAttachment);
     if((!currentPrompt.trim()&&!hasAttachment)||loading)return;
 
-    const instruction=currentPrompt.trim() || (currentAttachmentKind==='resume' ? 'Use this uploaded file as my resume.' : 'Analyze the attached reference document and help me improve my resume.');
+    const instruction=currentPrompt.trim() || (currentAttachmentKind==='resume' ? 'Use this uploaded file as my resume.' : 'Analyze the attached reference document. Give me evidence-based observations about its content and/or design, but do not change my resume unless I explicitly ask you to.');
     const att=currentAttachment?.name;
     setMessages(m=>[...m,{id:crypto.randomUUID(),role:'user',text:instruction,attachment:att}]);
     promptRef.current='';
@@ -245,7 +245,7 @@ const AgentWorkspace:React.FC=()=>{
       const r=await fetch('/api/agent',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({resumeData:workingResume,instruction,referenceText:referenceTextForAgent,referencePdfBase64:referencePdfForAgent})
+        body:JSON.stringify({resumeData:workingResume,instruction,referenceText:referenceTextForAgent,referencePdfBase64:referencePdfForAgent,conversation:messages.slice(-12).map(x=>({role:x.role,text:x.text}))})
       });
       const result=await r.json().catch(()=>({}));
       if(!r.ok){
