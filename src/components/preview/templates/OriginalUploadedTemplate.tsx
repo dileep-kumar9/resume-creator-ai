@@ -18,7 +18,7 @@ export const OriginalUploadedTemplate: React.FC<Props> = ({ data }) => {
   const sectionFontSize = bodyFontSize * (11 / 9.2);
   const contactFontSize = bodyFontSize * (9.5 / 9.2);
   const titleFontSize = bodyFontSize * (10.5 / 9.2);
-  const headingColor = data.colors.primary || '#4F8CC9';
+  const headingColor = data.colors.primary || '#262626';
 
   const visible = new Set(
     sections.filter(section => section.visible).map(section => section.id)
@@ -56,7 +56,7 @@ export const OriginalUploadedTemplate: React.FC<Props> = ({ data }) => {
       data-template="badham-original"
       style={{
         minHeight: '100%',
-        fontFamily: `${data.fontFamily || 'Helvetica'}, Arial, Helvetica, sans-serif`,
+        fontFamily: `${data.fontFamily || 'Arial'}, Arial, Helvetica, sans-serif`,
         fontSize: `${bodyFontSize}px`,
         lineHeight: 1.34,
         boxSizing: 'border-box',

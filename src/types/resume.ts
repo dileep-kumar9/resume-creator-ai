@@ -196,10 +196,10 @@ export function cleanResumeDate(value: unknown): string {
 }
 
 export const DEFAULT_COLORS: ResumeColors = {
-  primary: '#4F8CC9',
-  secondary: '#4b5563',
-  accent: '#10b981',
-  text: '#1f2937',
+  primary: '#262626',
+  secondary: '#444444',
+  accent: '#262626',
+  text: '#222222',
   background: '#ffffff'
 };
 

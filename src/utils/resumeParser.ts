@@ -92,8 +92,8 @@ function blankResume(): ResumeData {
     personalInfo: { fullName: '', jobTitle: '', email: '', phone: '', location: '', website: '', linkedin: '', github: '', profileImage: '', birthDate: '' },
     summary: '', experience: [], education: [], projects: [],
     skills: { mode: 'simple', simple: [], categorized: [] },
-    customSections: [], sections: DEFAULT_SECTIONS, colors: { ...DEFAULT_COLORS, primary: '#4F8CC9', secondary: '#4b5563', text: '#222222', background: '#ffffff' },
-    template: 'original-upload', pageFormat: 'letter', fontSize: 'medium', fontFamily: 'Helvetica'
+    customSections: [], sections: DEFAULT_SECTIONS, colors: { ...DEFAULT_COLORS, primary: '#262626', secondary: '#444444', accent: '#262626', text: '#222222', background: '#ffffff' },
+    template: 'original-upload', pageFormat: 'letter', fontSize: 'medium', fontFamily: 'Arial'
   };
 }
 

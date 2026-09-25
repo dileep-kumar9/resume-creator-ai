@@ -89,11 +89,11 @@ const initialResumeData: ResumeData = {
     { id: 'skills', title: 'Technical Skills', visible: true, order: 5 },
     { id: 'custom', title: 'Additional Sections', visible: true, order: 6 }
   ],
-  colors: { ...DEFAULT_COLORS, primary: '#4F8CC9', secondary: '#4b5563', text: '#222222', background: '#ffffff' },
+  colors: { ...DEFAULT_COLORS, primary: '#262626', secondary: '#444444', accent: '#262626', text: '#222222', background: '#ffffff' },
   template: 'original-upload',
   pageFormat: 'letter',
   fontSize: 'medium',
-  fontFamily: 'Helvetica',
+  fontFamily: 'Arial',
   originalTemplate: {
     sourceFileName: 'Badham_Dileep_Kumar_Updated_Resume.pdf',
     sourceFormat: 'pdf',
