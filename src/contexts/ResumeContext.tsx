@@ -51,7 +51,7 @@ const initialResumeData: ResumeData = {
   customSections: [],
   sections: DEFAULT_SECTIONS,
   colors: DEFAULT_COLORS,
-  template: 'tech-sidebar',
+  template: 'original-upload',
   pageFormat: 'letter',
   fontSize: 'medium',
   fontFamily: 'Inter'

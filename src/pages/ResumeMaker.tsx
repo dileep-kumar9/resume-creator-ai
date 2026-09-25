@@ -313,12 +313,26 @@ const AgentWorkspace:React.FC=()=>{
     setQaRunning(true); setQaResults([]); setRuntimeErrors([]);
     const resultRows:Array<{name:string;status:'pass'|'fail'|'info';detail?:string}> = [];
     const check=(name:string,condition:boolean,detail?:string)=>resultRows.push({name,status:condition?'pass':'fail',detail});
+    // IMPORTANT: E2E must never replace a real user resume with the synthetic
+    // e2e@example.com fixture. If the user has already imported a resume, run
+    // the end-to-end workflow against that real resume. The fixture remains a
+    // fallback only for a completely empty workspace.
+    const e2eResumeBefore=structuredClone(resumeDataRef.current);
+    const e2eCoreCount=(data:ResumeData)=>{
+      const skillCount=data.skills.mode==='simple'?data.skills.simple.length:data.skills.categorized.reduce((n,c)=>n+c.skills.length,0);
+      return (data.experience?.length||0)+(data.projects?.length||0)+(data.education?.length||0)+skillCount;
+    };
+    const hadRealResume=e2eCoreCount(e2eResumeBefore)>0;
     try{
       check('Control bridge loaded',true);
       setPanel('content'); check('Content panel selectable',true);
-      await importFixtureResume('pdf'); check('PDF resume fixture fetched',true);
-      await new Promise(r=>setTimeout(r,100));
-      await send();
+      if(hadRealResume){
+        check('Real uploaded resume retained for E2E',true,`${e2eResumeBefore.personalInfo?.fullName||'uploaded resume'} · ${e2eCoreCount(e2eResumeBefore)} core entries`);
+      }else{
+        await importFixtureResume('pdf'); check('PDF resume fixture fetched',true);
+        await new Promise(r=>setTimeout(r,100));
+        await send();
+      }
       const waitForSnapshot=async(predicate:(snapshot:any)=>boolean,timeout=5000)=>{
         const started=Date.now();
         while(Date.now()-started<timeout){
@@ -371,10 +385,20 @@ const AgentWorkspace:React.FC=()=>{
       check('Tailoring keeps original template',tailoredSnapshot.selectedTemplate==='original-upload',`template=${tailoredSnapshot.selectedTemplate}`);
       check('Tailoring preserves all imported entries',tailoredSnapshot.resumeCounts.experience>=(beforeTailor.experience?.length||0) && tailoredSnapshot.resumeCounts.projects>=(beforeTailor.projects?.length||0) && tailoredSnapshot.resumeCounts.education>=(beforeTailor.education?.length||0),JSON.stringify(tailoredSnapshot.resumeCounts));
       check('Tailoring changed editable content',JSON.stringify(tailoredData?.summary||'')!==JSON.stringify(beforeTailor?.summary||'') || JSON.stringify(tailoredData?.experience||[])!==JSON.stringify(beforeTailor?.experience||[]) || JSON.stringify(tailoredData?.projects||[])!==JSON.stringify(beforeTailor?.projects||[]) || JSON.stringify(tailoredData?.skills||{})!==JSON.stringify(beforeTailor?.skills||{}));
+      // DOCX is tested as an isolated import. Restore the user's real resume
+      // immediately afterward so Run full E2E never leaves the workspace showing
+      // the synthetic e2e@example.com candidate.
       await importFixtureResume('docx'); check('DOCX resume fixture fetched',true);
       await new Promise(r=>setTimeout(r,100)); await send(); await new Promise(r=>setTimeout(r,250));
       const docxSnapshot=(window as any).__RESUME_STUDIO_CONTROL__?.snapshot?.() || getSnapshot();
       check('DOCX import completed',!!docxSnapshot.originalTemplate && docxSnapshot.originalTemplate.sourceFormat==='docx');
+      if(hadRealResume){
+        importResumeData(e2eResumeBefore);
+        resumeDataRef.current=e2eResumeBefore;
+        setResumeOpen(true);
+        setResumeEditMode(false);
+        await new Promise(r=>setTimeout(r,150));
+      }
       await copyMessage({id:'qa-copy',role:'assistant',text:'Resume Studio E2E copy test'}); check('Chat copy action available',true);
       check('No runtime errors recorded',runtimeErrors.length===0,runtimeErrors.join(' | '));
     }catch(e){resultRows.push({name:'Full E2E runner',status:'fail',detail:e instanceof Error?e.message:String(e)});}

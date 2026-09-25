@@ -30,19 +30,6 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   // user explicitly chooses a built-in editable template.
   const visualTemplate = resumeData.template;
 
-  if (visualTemplate === 'original-upload' && resumeData.originalTemplate?.sourceDataUrl && !resumeData.originalTemplate.tailored) {
-    return (
-      <div ref={previewHostRef} className="w-full h-full flex items-center justify-center p-2">
-        <div id="resume-content" data-control="resume-rendered" className="w-full h-full bg-white shadow-xl overflow-hidden">
-          {resumeData.originalTemplate.sourceFormat === 'pdf' ? (
-            <iframe title="Original uploaded resume" src={resumeData.originalTemplate.sourceDataUrl} className="w-full h-full border-0" />
-          ) : (
-            <div className="p-8 text-sm text-muted-foreground"><strong>Original uploaded document:</strong> {resumeData.originalTemplate.sourceFileName}<p className="mt-2">The original document is preserved as uploaded.</p></div>
-          )}
-        </div>
-      </div>
-    );
-  }
 
   const renderTemplate = () => {
     switch (visualTemplate) {

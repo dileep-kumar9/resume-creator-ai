@@ -93,7 +93,7 @@ function blankResume(): ResumeData {
     summary: '', experience: [], education: [], projects: [],
     skills: { mode: 'simple', simple: [], categorized: [] },
     customSections: [], sections: DEFAULT_SECTIONS, colors: DEFAULT_COLORS,
-    template: 'tech-sidebar', pageFormat: 'letter', fontSize: 'medium', fontFamily: 'Inter'
+    template: 'original-upload', pageFormat: 'letter', fontSize: 'medium', fontFamily: 'Inter'
   };
 }
 

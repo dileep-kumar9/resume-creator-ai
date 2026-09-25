@@ -1,80 +1,164 @@
 import React from 'react';
 import { ResumeData } from '../../../types/resume';
+import { normalizeUrl } from '../../../utils/links';
 
 interface Props { data: ResumeData }
 
-const Heading: React.FC<{children: React.ReactNode}> = ({children}) => (
-  <div className="mb-2 mt-4 border-b border-blue-200 pb-1 text-[9px] font-bold uppercase tracking-wide text-blue-600">{children}</div>
-);
-
+/**
+ * Extracted from Badham Dileep Kumar's uploaded resume PDF.
+ * This is a reusable template/layout, not an image/PDF background:
+ * centered header, compact contact row, black ruled section headings,
+ * single-column content, bold entry titles, and compact bullet lists.
+ */
 export const OriginalUploadedTemplate: React.FC<Props> = ({ data }) => {
-  const { personalInfo, summary, experience, education, projects, skills } = data;
-  const cats = skills.categorized.length
+  const { personalInfo, summary, experience, education, projects, skills, sections } = data;
+
+  const visible = new Set(
+    sections.filter(section => section.visible).map(section => section.id)
+  );
+
+  const categories = skills.categorized.length
     ? skills.categorized
-    : (skills.simple.length ? [{ id:'simple', name:'Skills', skills:skills.simple }] : []);
-  const link = (label:string, value?:string) => {
+    : (skills.simple.length ? [{ id: 'simple', name: 'Skills', skills: skills.simple }] : []);
+
+  const external = (value: string) => /^https?:\/\//i.test(value) ? value : normalizeUrl(value);
+
+  const ContactLink = ({ label, value, kind }: { label: string; value?: string; kind?: 'email' | 'phone' | 'url' }) => {
     if (!value) return null;
-    const href = /^https?:\/\//i.test(value) ? value : label === 'Email' ? `mailto:${value}` : label === 'Phone' ? `tel:${value.replace(/[^+\d]/g,'')}` : value;
-    return <a href={href} target={/^https?:\/\//i.test(href) ? '_blank' : undefined} rel={/^https?:\/\//i.test(href) ? 'noreferrer' : undefined} className="text-[10px] text-gray-700 hover:text-blue-700 underline-offset-2 hover:underline">{label === 'Portfolio' || label === 'LinkedIn' ? label : value}</a>;
+    const href = kind === 'email'
+      ? `mailto:${value}`
+      : kind === 'phone'
+        ? `tel:${value.replace(/[^+\d]/g, '')}`
+        : external(value);
+    const display = label === 'Portfolio' || label === 'LinkedIn' ? label : value;
+    return <a href={href} target={kind === 'url' ? '_blank' : undefined} rel={kind === 'url' ? 'noreferrer' : undefined} className="hover:underline">{display}</a>;
   };
+
+  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <section className="mb-[13px]">
+      <h2 className="mb-[7px] border-b border-black pb-[4px] text-[12px] font-bold uppercase leading-none">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+
   return (
-    <div className="w-full bg-white text-black" style={{fontFamily:'Arial, Helvetica, sans-serif', minHeight:'100%'}}>
-      <header className="px-[7%] pt-[6%] pb-[3%]">
-        <div className="text-[19px] font-normal leading-tight">{personalInfo.fullName || 'Your Name'}</div>
-        {personalInfo.jobTitle && <div className="mt-1 text-[12px] leading-tight">{personalInfo.jobTitle}</div>}
-        <div className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] leading-tight">
-          {personalInfo.email && link('Email', personalInfo.email)}
-          {personalInfo.phone && <><span>|</span>{link('Phone', personalInfo.phone)}</>}
-          {personalInfo.location && <><span>|</span>{link('Location', personalInfo.location)}</>}
-          {personalInfo.website && <><span>|</span>{link('Portfolio', personalInfo.website)}</>}
-          {personalInfo.linkedin && <><span>|</span>{link('LinkedIn', personalInfo.linkedin)}</>}
+    <div
+      className="w-full bg-white text-black"
+      data-template="badham-original"
+      style={{
+        minHeight: '100%',
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '11px',
+        lineHeight: 1.34,
+        boxSizing: 'border-box',
+      }}
+    >
+      <header className="text-center pb-[10px]">
+        <h1 className="m-0 text-[18px] font-bold leading-[1.05]">
+          {personalInfo.fullName || 'Your Name'}
+        </h1>
+
+        <div className="mt-[5px] text-[10px] leading-[1.25]">
+          {personalInfo.email && <ContactLink label="Email" value={personalInfo.email} kind="email" />}
+          {personalInfo.phone && <><span> | </span><ContactLink label="Phone" value={personalInfo.phone} kind="phone" /></>}
+          {personalInfo.location && <><span> | </span><span>{personalInfo.location}</span></>}
+          {personalInfo.linkedin && <><span> | </span><ContactLink label="LinkedIn" value={personalInfo.linkedin} kind="url" /></>}
+          {personalInfo.website && <><span> | </span><ContactLink label="Portfolio" value={personalInfo.website} kind="url" /></>}
         </div>
+
+        {personalInfo.jobTitle && (
+          <div className="mt-[9px] text-[13px] font-bold leading-[1.15]">
+            {personalInfo.jobTitle}
+          </div>
+        )}
       </header>
 
-      <main className="px-[7%] pb-[7%]">
-        {summary && <section className="mb-4">
-          <h2 className="mb-1 text-[12px] font-bold uppercase">PROFESSIONAL SUMMARY</h2>
-          <p className="text-[11px] leading-[1.35]">{summary}</p>
-        </section>}
+      <main>
+        {visible.has('summary') && summary && (
+          <Section title="Professional Summary">
+            <p className="m-0 text-justify">{summary}</p>
+          </Section>
+        )}
 
-        {experience.length > 0 && <section className="mb-4">
-          <h2 className="mb-1 text-[12px] font-bold uppercase">EXPERIENCE</h2>
-          <div className="space-y-2">
-            {experience.map(e => <div key={e.id} className="text-[11px] leading-[1.35]">
-              <div><span className="font-bold">{e.jobTitle}</span>{e.company ? ` | ${e.company}` : ''}{e.location ? ` | ${e.location}` : ''}{e.startDate || e.endDate ? ` | ${e.startDate}${e.endDate ? ` - ${e.endDate}` : ''}` : ''}</div>
-              {e.bulletPoints.length > 0 && <ul className="ml-4 list-disc space-y-0.5">{e.bulletPoints.map((b,i)=><li key={i}>{b}</li>)}</ul>}
-              {!e.bulletPoints.length && e.description && <p>{e.description}</p>}
-            </div>)}
-          </div>
-        </section>}
+        {visible.has('skills') && categories.length > 0 && (
+          <Section title="Core Skills">
+            <div className="space-y-[5px]">
+              {categories.map((category, index) => (
+                <div key={category.id || index} className="flex items-start gap-[5px]">
+                  <span className="mt-[1px]">•</span>
+                  <div>
+                    <strong>{category.name}:</strong>{' '}
+                    <span>{category.skills.join(', ')}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
 
-        {projects.length > 0 && <section className="mb-4">
-          <h2 className="mb-1 text-[12px] font-bold uppercase">PROJECTS</h2>
-          <div className="space-y-2">
-            {projects.map(p => <div key={p.id} className="text-[11px] leading-[1.35]">
-              <div><span className="font-bold">{p.title}</span>{p.technologies.length ? ` | ${p.technologies.join(', ')}` : ''}{p.startDate || p.endDate ? ` | ${p.startDate}${p.endDate ? ` - ${p.endDate}` : ''}` : ''}</div>
-              {p.description && <p>{p.description}</p>}
-              <div className="flex flex-wrap gap-x-2">
-                {p.liveUrl && <a href={p.liveUrl} target="_blank" rel="noreferrer" className="text-blue-700 underline">Portfolio</a>}
-                {p.githubUrl && <a href={p.githubUrl} target="_blank" rel="noreferrer" className="text-blue-700 underline">Code</a>}
-              </div>
-            </div>)}
-          </div>
-        </section>}
+        {visible.has('experience') && experience.length > 0 && (
+          <Section title="Internship Experience">
+            <div className="space-y-[7px]">
+              {experience.map(item => (
+                <div key={item.id}>
+                  <div className="mb-[3px]">
+                    <strong>{item.jobTitle}</strong>
+                    {item.company && <> <span>|</span> {item.company}</>}
+                    {(item.startDate || item.endDate) && <> <span>|</span> {item.startDate}{item.endDate ? ` - ${item.endDate}` : ''}</>}
+                  </div>
+                  {item.bulletPoints.length > 0 ? (
+                    <ul className="m-0 ml-[15px] list-disc space-y-[2px] pl-[8px]">
+                      {item.bulletPoints.map((bullet, index) => <li key={index}>{bullet}</li>)}
+                    </ul>
+                  ) : item.description ? <p className="m-0">{item.description}</p> : null}
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
 
-        {education.length > 0 && <section className="mb-4">
-          <h2 className="mb-1 text-[12px] font-bold uppercase">EDUCATION</h2>
-          <div className="space-y-1 text-[11px] leading-[1.35]">
-            {education.map(e => <div key={e.id}>{e.degree}{e.institution ? ` | ${e.institution}` : ''}{e.graduationYear ? ` | ${e.graduationYear}` : ''}{e.gpa ? ` | CGPA ${e.gpa}` : ''}</div>)}
-          </div>
-        </section>}
+        {visible.has('projects') && projects.length > 0 && (
+          <Section title="Key Projects">
+            <div className="space-y-[8px]">
+              {projects.map(project => (
+                <div key={project.id}>
+                  <div className="mb-[3px]">
+                    <strong>{project.title}</strong>
+                    {project.technologies.length > 0 && <> <span>|</span> <em>{project.technologies.join(', ')}</em></>}
+                    {(project.startDate || project.endDate) && <> <span>|</span> {project.startDate}{project.endDate ? ` - ${project.endDate}` : ''}</>}
+                  </div>
+                  {project.description && <p className="m-0">{project.description}</p>}
+                  {(project.liveUrl || project.githubUrl) && (
+                    <div className="mt-[2px] flex gap-3 text-[10px]">
+                      {project.liveUrl && <a href={external(project.liveUrl)} target="_blank" rel="noreferrer" className="underline">Portfolio</a>}
+                      {project.githubUrl && <a href={external(project.githubUrl)} target="_blank" rel="noreferrer" className="underline">Code</a>}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
 
-        {cats.length > 0 && <section>
-          <h2 className="mb-1 text-[12px] font-bold uppercase">SKILLS</h2>
-          <div className="text-[11px] leading-[1.35]">
-            {cats.map((c,i) => <div key={c.id || i}><span className="font-bold">{c.name}:</span> {c.skills.join(', ')}</div>)}
-          </div>
-        </section>}
+        {visible.has('education') && education.length > 0 && (
+          <Section title="Education">
+            <div className="space-y-[4px]">
+              {education.map(item => (
+                <div key={item.id} className="flex items-start gap-[5px]">
+                  <span>•</span>
+                  <div>
+                    <strong>{item.degree}</strong>
+                    {item.institution && <> <span>|</span> {item.institution}</>}
+                    {item.gpa && <> <span>|</span> CGPA: {item.gpa}</>}
+                    {item.graduationYear && <> <span>({item.graduationYear})</span></>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
       </main>
     </div>
   );

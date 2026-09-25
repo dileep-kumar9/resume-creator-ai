@@ -65,10 +65,10 @@ export const AITailorPanel: React.FC = () => {
       if (!result.resumeData) throw new Error('The Resume Agent returned an invalid resume result.');
       setPreviousResume(structuredClone(state.resumeData));
       const next = structuredClone(result.resumeData as ResumeData);
-      // The uploaded document remains the selected template until the user explicitly
-      // chooses another template. Never let an AI response silently switch it.
+      // The user's selected template is authoritative. AI tailoring changes
+      // resume content only and must never silently switch the template.
+      next.template = state.resumeData.template;
       if (state.resumeData.originalTemplate) {
-        next.template = 'original-upload';
         next.originalTemplate = structuredClone(state.resumeData.originalTemplate);
         next.originalTemplate.tailored = true;
       }

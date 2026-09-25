@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { TEMPLATE_CONFIGS, TemplateType } from '../../../types/resume';
-import { Check, Eye } from 'lucide-react';
+import { Check, Eye, LayoutTemplate } from 'lucide-react';
 
 export const TemplateSelector: React.FC = () => {
   const { state, updateTemplate } = useResume();
@@ -20,67 +20,51 @@ export const TemplateSelector: React.FC = () => {
         <CardTitle>Choose Template</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Card
-            className={`border-2 overflow-hidden cursor-pointer transition-all ${selectedTemplate === 'original-upload' ? 'border-primary ring-2 ring-primary/30' : 'border-dashed hover:border-primary/50'}`}
-            onClick={() => state.resumeData.originalTemplate && updateTemplate('original-upload')}
-          >
-            <div className="relative bg-muted/30 border-b">
-              <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
-                <Badge className="bg-background/95 text-foreground border shadow-sm">Original uploaded template</Badge>
-                <Badge variant="outline" className="bg-background/95 text-foreground">
-                  {state.resumeData.originalTemplate?.sourceFormat?.toUpperCase() || 'PDF'}
-                </Badge>
-              </div>
-              {selectedTemplate === 'original-upload' && (
-                <div className="absolute right-3 top-3 z-10 rounded-full bg-primary p-1.5 text-primary-foreground shadow">
-                  <Check className="w-4 h-4" />
-                </div>
-              )}
-              <div className="h-64 w-full overflow-hidden bg-white flex items-center justify-center">
-                {(state.resumeData.originalTemplate?.sourceFormat === 'pdf' && state.resumeData.originalTemplate.sourceDataUrl) || !state.resumeData.originalTemplate ? (
-                  <iframe
-                    title="Original uploaded resume template preview"
-                    src={state.resumeData.originalTemplate?.sourceDataUrl || '/templates/badham-dileep-kumar-original-resume.pdf'}
-                    className="h-full w-full border-0 pointer-events-none"
-                  />
-                ) : (
-                  <div className="px-6 text-center text-sm text-muted-foreground">
-                    <div className="mx-auto mb-2 w-12 h-14 rounded border bg-white flex items-center justify-center">
-                      <span className="text-xs font-semibold">PDF</span>
-                    </div>
-                    Preview is preserved when the original document is opened.
-                  </div>
-                )}
-              </div>
-            </div>
+        <Card className={`border-2 ${selectedTemplate === 'original-upload' ? 'border-primary ring-2 ring-primary/30' : 'border-dashed'}`}>
             <CardContent className="p-4">
+              <div className="mb-3 overflow-hidden rounded-md border bg-white p-3">
+                <div className="text-center text-[9px] text-black">
+                  <div className="font-bold text-[12px]">Badham Dileep Kumar</div>
+                  <div className="mt-1 text-[7px]">Email | Phone | Location | LinkedIn | Portfolio</div>
+                  <div className="mt-1 font-bold text-[8px]">Technical Customer Support Engineer | Customer Success & Troubleshooting</div>
+                </div>
+                {['PROFESSIONAL SUMMARY','CORE SKILLS','INTERNSHIP EXPERIENCE','KEY PROJECTS','EDUCATION'].map((heading) => (
+                  <div key={heading} className="mt-2">
+                    <div className="text-[7px] font-bold text-black">{heading}</div>
+                    <div className="mt-0.5 h-px w-full bg-black" />
+                    <div className="mt-1 space-y-0.5">
+                      <div className="h-1.5 w-[92%] rounded bg-gray-200" />
+                      <div className="h-1.5 w-[82%] rounded bg-gray-200" />
+                    </div>
+                  </div>
+                ))}
+              </div>
               <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-base">Original Uploaded Resume</h3>
-                    <p className="text-sm text-muted-foreground mt-1 break-words">
-                      {state.resumeData.originalTemplate?.sourceFileName || 'Badham Dileep Kumar — Original Resume'}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      This is your original resume design. It is kept as a first-class template and is never replaced automatically by AI tailoring.
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <LayoutTemplate className="w-4 h-4 text-primary" />
+                      <h3 className="font-semibold text-base">Original Resume — Badham Layout</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Extracted from your original resume: centered header, compact contact row, ruled section headings, bold entry titles, and a clean single-column layout. This is a reusable template for your resume content.
                     </p>
                   </div>
+                  {selectedTemplate === 'original-upload' && <Check className="w-5 h-5 text-primary" />}
                 </div>
+                <div className="flex flex-wrap gap-2"><Badge variant="default" className="text-xs">First choice</Badge><Badge variant="outline" className="text-xs">Extracted from your original PDF</Badge></div>
                 {state.resumeData.originalTemplate?.tailored && (
                   <div className="rounded-md bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-muted-foreground">
-                    Tailored resume data is currently rendered using the original-style editable layout.
+                    This template is editable and remains selected during tailoring. AI changes resume content only; it does not replace this layout.
                   </div>
                 )}
                 <Button
                   variant={selectedTemplate === 'original-upload' ? 'default' : 'outline'}
-                  disabled={!state.resumeData.originalTemplate}
                   size="sm"
                   className="w-full"
-                  onClick={(e) => { e.stopPropagation(); if (state.resumeData.originalTemplate) updateTemplate('original-upload'); }}
+                  onClick={() => updateTemplate('original-upload')}
                 >
-                  {selectedTemplate === 'original-upload' ? (
-                    <><Check className="w-4 h-4 mr-2" />Original Selected</>
-                  ) : state.resumeData.originalTemplate ? 'Use Original' : 'Upload Resume to Activate'}
+                  {selectedTemplate === 'original-upload' ? 'Selected' : 'Use This Template'}
                 </Button>
               </div>
             </CardContent>
