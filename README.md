@@ -152,3 +152,13 @@ The Resume Studio now exposes a browser-control contract for end-to-end inspecti
 The bridge controls the real UI and state rather than a mock test page. It supports resume fixture import (PDF/DOCX), arbitrary base64 file attachment, chat input/send, tailoring, artifact open/close/resize, Preview/Edit, template selection, undo, exports, message copy, panel navigation, DOM clicks/types, state snapshots, diagnostics, and the full E2E runner.
 
 The E2E runner exercises the actual import and chat tailoring paths and reports failures in the Control Center. Provider failures are reported as failures; the test never pretends that an unavailable AI provider succeeded.
+
+
+## Resume tailoring quality update
+
+- Tailoring instructions now require evidence-bounded, role-specific rewriting and prohibit converting API projects into autonomous agents, apps into dashboards, or unmentioned work into production deployments.
+- Experience entry and bullet counts are preserved; malformed model output falls back to the original bullets for that entry.
+- Skill ordering now preserves every original skill, even if the model returns a partial ordering.
+- If configured AI providers fail or return no meaningful rewrite, the API now returns an error and leaves the resume unchanged rather than presenting a weak keyword-appending fallback as successful tailoring.
+
+Keep API credentials in your deployment environment. The distributable source archive intentionally excludes `.env`, `.git`, `node_modules`, and build output.

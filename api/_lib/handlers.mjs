@@ -53,14 +53,14 @@ FACTUAL INTEGRITY IS ABSOLUTE:
 - Do not add a skill merely because it appears in the JD. Only reorder/select skills already present in the candidate resume.
 - Preserve company names, job titles, dates, education, project names, technologies and URLs exactly.
 - Preserve the number and order of experience entries and projects.
-- Rewrite existing bullets when the original evidence supports stronger, JD-relevant wording.
-- Rewrite project descriptions only when supported by the existing project description/technology information.
-- Do not manufacture financial, ML, Rust, Java, distributed-systems, forecasting, anomaly-detection or other JD experience when the resume does not support it.
-- If a requirement is a genuine gap, report it as a gap instead of pretending the candidate has it.
-- Make the tailored version visibly more relevant: use the JD's terminology where it accurately describes existing evidence, improve action verbs, emphasize relevant technical work, and prioritize the strongest matching skills.
-- A JD-tailoring request MUST produce actual rewritten content, not a lightly reformatted copy. Rewrite the professional summary specifically for the target role. Rewrite the candidate's relevant experience bullets and project descriptions using materially different wording while preserving their facts. Do not copy any original bullet verbatim when a truthful rewrite is possible. Reorder existing skills to put the most relevant supported skills first.
-- The tailored summary and rewritten bullets must explicitly connect the candidate's existing evidence to the JD's responsibilities where justified (for example Python, SQL, data analysis, AI/API work, unstructured-data processing, AWS, debugging). Never add unsupported technologies or achievements.
-- Return one complete tailored content result, not generic advice.
+- Treat every original resume entry as a closed evidence boundary: rewrite only facts stated in that entry. Do not add plausible-but-unmentioned implementation details, business impact, users, scale, deployment status, metrics, or outcomes.
+- Rewrite existing bullets only when the source supports a clearer, more relevant formulation. Keep each bullet's factual meaning intact. Preserve the exact number and order of experience entries, projects, and bullets within each experience entry.
+- Rewrite project descriptions only from the project's own source description and listed technologies. Do not turn an API integration into an autonomous agent, a database-backed app into an analytics dashboard, or a prototype into a production deployment unless the source explicitly says so.
+- Do not manufacture financial, ML, Rust, Java, distributed-systems, forecasting, anomaly-detection, optimization, reconciliation, or other JD experience when the resume does not support it. Mention unsupported requirements only in analysis.gaps.
+- Make the result meaningfully tailored through prioritization and precise phrasing, not keyword stuffing. Write a concise, role-specific summary grounded in the strongest evidence. Use JD terminology only when it is an accurate description of that evidence.
+- Keep all original skills; reorder them by relevance, but never remove skills or add JD-only skills. Do not change candidate identity, job titles, employers, dates, education, project names, technologies, URLs, or template.
+- For each experience entry, return one rewritten bullet for each source bullet in the same order. If a bullet cannot be improved without adding assumptions, preserve its meaning with a conservative rewrite.
+- Return a complete tailored content result plus specific strengths, gaps, and recommendations. Avoid generic claims such as “results-driven”, “proven ability”, “measurable impact”, or “successfully deployed” unless directly supported.
 
 OUTPUT JSON MUST MATCH THE PROVIDED SCHEMA.
 
@@ -236,18 +236,28 @@ function applyTailoring(original,ai){
   if(!normalized) throw new Error('AI returned JSON, but no usable tailored resume was found.');
   const result=structuredClone(original); const t=normalized.tailoredResume;
   if(typeof t.summary==='string'&&t.summary.trim()) result.summary=t.summary.trim();
-  if(Array.isArray(t.experienceBulletPoints)) {
-    result.experience=(original.experience||[]).map((x,i)=>({...x,bulletPoints:Array.isArray(t.experienceBulletPoints[i])&&t.experienceBulletPoints[i].length?t.experienceBulletPoints[i].filter(v=>typeof v==='string'&&v.trim()).map(v=>v.trim()):x.bulletPoints}));
+  if(Array.isArray(t.experienceBulletPoints) && t.experienceBulletPoints.length === (original.experience||[]).length) {
+    result.experience=(original.experience||[]).map((x,i)=>{
+      const proposed=t.experienceBulletPoints[i];
+      // A model must not silently delete, add, or merge a source bullet.
+      const valid=Array.isArray(proposed) && proposed.length === (x.bulletPoints||[]).length && proposed.every(v=>typeof v==='string'&&v.trim());
+      return {...x,bulletPoints:valid?proposed.map(v=>v.trim()):x.bulletPoints};
+    });
   }
   if(Array.isArray(t.projectDescriptions)) {
     result.projects=(original.projects||[]).map((x,i)=>({...x,description:typeof t.projectDescriptions[i]==='string'&&t.projectDescriptions[i].trim()?t.projectDescriptions[i].trim():x.description}));
   }
   if(Array.isArray(t.skillsOrder)){
-    const originalSkills=collectSkills(original.skills); const lookup=new Map(originalSkills.map(s=>[s.toLowerCase(),s]));
-    const ordered=[...new Set(t.skillsOrder.map(s=>typeof s==='string'?lookup.get(s.trim().toLowerCase()):'').filter(Boolean))];
-    if(ordered.length){
-      if(original.skills.mode==='simple') result.skills={...original.skills,simple:ordered};
-      else result.skills={...original.skills,categorized:(original.skills.categorized||[]).map(c=>({...c,skills:c.skills.filter(s=>ordered.some(x=>x.toLowerCase()===s.toLowerCase()))}))};
+    const originalSkills=collectSkills(original.skills);
+    const lookup=new Map(originalSkills.map(s=>[s.toLowerCase(),s]));
+    const requested=[...new Set(t.skillsOrder.map(s=>typeof s==='string'?lookup.get(s.trim().toLowerCase()):'').filter(Boolean))];
+    // Reordering must never drop an original skill, even if the model returns a
+    // partial list. Keep every source skill and append omitted items in source order.
+    const ordered=[...requested,...originalSkills.filter(s=>!requested.some(x=>x.toLowerCase()===s.toLowerCase()))];
+    if(original.skills.mode==='simple') result.skills={...original.skills,simple:ordered};
+    else {
+      const remaining=[...ordered];
+      result.skills={...original.skills,categorized:(original.skills.categorized||[]).map(c=>({...c,skills:[...c.skills].sort((a,b)=>remaining.findIndex(x=>x.toLowerCase()===a.toLowerCase())-remaining.findIndex(x=>x.toLowerCase()===b.toLowerCase()))}))};
     }
   }
   return result;
@@ -405,11 +415,9 @@ async function handleAgent(req,res){
         console.warn('AI tailoring providers unavailable; using safe local tailoring fallback:', providerError?.message || providerError);
       }
       if(!tailoredResume || contentFingerprint(tailoredResume)===contentFingerprint(b.resumeData)){
-        tailoredResume=localTailorResume(b.resumeData,b.instruction.trim());
-        fallbackUsed=true;
-      }
-      if(!tailoredResume || contentFingerprint(tailoredResume)===contentFingerprint(b.resumeData)){
-        throw Object.assign(new Error('No tailored resume changes could be produced.'),{status:502});
+        // Do not claim success with a keyword-appending fallback. A genuine
+        // tailoring result must contain a substantive, provider-generated rewrite.
+        throw Object.assign(new Error('The AI providers did not return a usable tailored resume. Your original resume was left unchanged. Please retry in a moment.'),{status:502});
       }
       const a=tailoredResult?.data?.analysis||{
         summary:'Applied a factual local tailoring pass because the external AI providers did not return a usable result.',
@@ -425,7 +433,7 @@ async function handleAgent(req,res){
         'Reframed relevant project descriptions using existing facts and technologies.',
         'Reordered existing skills by relevance to the job description.'
       ];
-      sendJson(res,200,{resumeData:tailoredResume,intent:'tailor',message:fallbackUsed?'Resume tailored using a safe local fallback because the AI provider did not return a usable result.':'Resume tailored to the job description using only supported candidate evidence.',analysis:a,changes,provider:tailoredResult?.provider||'local',model:tailoredResult?.model||'local'});
+      sendJson(res,200,{resumeData:tailoredResume,intent:'tailor',message:'Resume tailored to the job description using only supported candidate evidence.',analysis:a,changes,provider:tailoredResult?.provider||'unknown',model:tailoredResult?.model||'unknown'});
       return;
     }
 
