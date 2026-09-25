@@ -42,7 +42,20 @@ export async function importResumeFromFile(file: File, useAI = true): Promise<Re
     } catch {
       aiData = localData;
     }
-    const data = normalizeParsedResume(aiData, localData);
+    let data = normalizeParsedResume(aiData, localData);
+    // Never allow a valid-but-sparse AI extraction to hide source sections.
+    // Merge each core collection from the local text parse when the AI result
+    // omitted it. This is deliberately additive: AI can improve fields, but it
+    // cannot erase factual source entries.
+    data = {
+      ...data,
+      experience: data.experience.length ? data.experience : localData.experience,
+      projects: data.projects.length ? data.projects : localData.projects,
+      education: data.education.length ? data.education : localData.education,
+      skills: (data.skills.simple.length || data.skills.categorized.length) ? data.skills : localData.skills,
+      summary: data.summary || localData.summary,
+      personalInfo: { ...localData.personalInfo, ...data.personalInfo, fullName: data.personalInfo.fullName || localData.personalInfo.fullName, jobTitle: data.personalInfo.jobTitle || localData.personalInfo.jobTitle, email: data.personalInfo.email || localData.personalInfo.email, phone: data.personalInfo.phone || localData.personalInfo.phone, location: data.personalInfo.location || localData.personalInfo.location, website: data.personalInfo.website || localData.personalInfo.website, linkedin: data.personalInfo.linkedin || localData.personalInfo.linkedin }
+    };
     return { ...data, template: 'original-upload', originalTemplate: { sourceFileName: file.name, sourceFormat: 'pdf', importedAt: new Date().toISOString(), sourceDataUrl: `data:application/pdf;base64,${btoa(binary)}`, editableTemplate: 'modern-minimal' } };
   }
 
@@ -63,6 +76,15 @@ export async function importResumeFromFile(file: File, useAI = true): Promise<Re
   let binary = '';
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  data = {
+    ...data,
+    experience: data.experience.length ? data.experience : localData.experience,
+    projects: data.projects.length ? data.projects : localData.projects,
+    education: data.education.length ? data.education : localData.education,
+    skills: (data.skills.simple.length || data.skills.categorized.length) ? data.skills : localData.skills,
+    summary: data.summary || localData.summary,
+    personalInfo: { ...localData.personalInfo, ...data.personalInfo, fullName: data.personalInfo.fullName || localData.personalInfo.fullName, jobTitle: data.personalInfo.jobTitle || localData.personalInfo.jobTitle, email: data.personalInfo.email || localData.personalInfo.email, phone: data.personalInfo.phone || localData.personalInfo.phone, location: data.personalInfo.location || localData.personalInfo.location, website: data.personalInfo.website || localData.personalInfo.website, linkedin: data.personalInfo.linkedin || localData.personalInfo.linkedin }
+  };
   return { ...data, template: 'original-upload', originalTemplate: { sourceFileName: file.name, sourceFormat: ext, importedAt: new Date().toISOString(), sourceDataUrl: `data:${mime};base64,${btoa(binary)}`, editableTemplate: 'modern-minimal' } };
 }
 

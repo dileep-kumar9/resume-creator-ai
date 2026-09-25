@@ -177,8 +177,36 @@ const AgentWorkspace:React.FC=()=>{
       // A resume upload is parsed only after Send. This prevents sidebar/tab
       // changes and file selection from mutating the live resume automatically.
       let workingResume=resumeDataRef.current;
-      if(currentAttachment && currentAttachmentKind==='resume'){
+      const resumeCoreCount=(data:ResumeData)=>{
+        const skillCount=data.skills.mode==='simple'?data.skills.simple.length:data.skills.categorized.reduce((n,c)=>n+c.skills.length,0);
+        return (data.experience?.length||0)+(data.projects?.length||0)+(data.education?.length||0)+skillCount;
+      };
+      const looksLikeResumeAttachment=(file:File)=>{
+        const name=file.name.toLowerCase();
+        return /resume|cv|curriculum/.test(name) || /\b(professional summary|core skills|internship experience|professional experience|key projects|education)\b/i.test(attachmentText);
+      };
+
+      // A PDF/DOCX added through the paperclip is often the user's resume. If
+      // the workspace does not yet contain a real resume, automatically treat a
+      // resume-looking attachment as the resume source. This prevents the
+      // common failure where the user attaches their resume + JD but the file is
+      // accidentally sent only as a visual reference, leaving the AI with an
+      // empty resume object. An existing parsed resume is never overwritten by
+      // a reference attachment.
+      const shouldImportAttachedResume=Boolean(
+        currentAttachment &&
+        (currentAttachmentKind==='resume' || (resumeCoreCount(workingResume)===0 && looksLikeResumeAttachment(currentAttachment)))
+      );
+
+      if(currentAttachment && shouldImportAttachedResume){
         workingResume=await importResumeFromFile(currentAttachment,!currentAttachment.name.toLowerCase().endsWith('.json'));
+        if(resumeCoreCount(workingResume)===0){
+          throw new Error('The uploaded resume could not be parsed into experience, projects, education, or skills. Please verify the file contains selectable text.');
+        }
+        // Update the ref immediately as well as React state so a second send in
+        // the same automation/user interaction always sees the newly imported
+        // resume instead of the previous render's stale closure.
+        resumeDataRef.current=workingResume;
         importResumeData(workingResume);
         openArtifact();
 
@@ -191,8 +219,9 @@ const AgentWorkspace:React.FC=()=>{
         }
       }
 
-      const referenceTextForAgent=currentAttachmentKind==='reference' ? attachmentText : '';
-      const referencePdfForAgent=currentAttachmentKind==='reference' ? attachmentPdf : '';
+      resumeDataRef.current=workingResume;
+      const referenceTextForAgent=currentAttachmentKind==='reference' && !shouldImportAttachedResume ? attachmentText : '';
+      const referencePdfForAgent=currentAttachmentKind==='reference' && !shouldImportAttachedResume ? attachmentPdf : '';
       const r=await fetch('/api/agent',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -306,7 +335,12 @@ const AgentWorkspace:React.FC=()=>{
       setPanel('templates'); check('Templates panel selectable',true);
       setPanel('customize'); check('Customize panel selectable',true);
       setPanel('settings'); check('Settings panel selectable',true);
-      setPanel('content'); openArtifact(); setResumeEditMode(false); check('Artifact opened',true);
+      setPanel('content'); openArtifact(); setResumeEditMode(false);
+      await new Promise(r=>setTimeout(r,150));
+      check('Artifact opened',true,`width=${getSnapshot().artifactWidth}`);
+      check('Artifact renders resume content',Boolean(document.querySelector('#resume-content')) && ((document.querySelector('#resume-content')?.textContent||'').trim().length>80),`contentLength=${(document.querySelector('#resume-content')?.textContent||'').trim().length}`);
+      check('Preview control available',Boolean(document.querySelector('[data-control=preview]')));
+      check('Edit control available',Boolean(document.querySelector('[data-control=edit]')));
       setArtifactWidth(Math.max(280,Math.min(720,Math.floor(window.innerWidth*.38)))); check('Artifact resize command accepted',true);
       setArtifactWidth(1); setResumeOpen(false); check('Artifact can close at near-zero width',true);
       openArtifact(); setResumeEditMode(true); check('Artifact Edit mode available',true);

@@ -1023,3 +1023,54 @@ html, body, #root {
   min-height: 30px;
   padding-inline: 9px;
 }
+
+/* Created-resume header: Preview/Edit must never overlap the title or each other. */
+.resume-artifact-header {
+  height: auto;
+  min-height: 58px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.resume-artifact-header > .min-w-0 {
+  flex: 1 1 180px;
+  min-width: 150px;
+}
+.resume-artifact-header-actions {
+  flex: 0 0 auto;
+  min-width: max-content;
+}
+.resume-artifact-mode-controls {
+  flex: 0 0 auto;
+  min-width: max-content;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 2px;
+  background: hsl(var(--muted) / .45);
+  gap: 2px;
+}
+.resume-artifact-mode-controls button {
+  flex: 0 0 auto;
+  min-width: 72px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+@media (max-width: 520px) {
+  .resume-artifact-header {
+    align-items: flex-start;
+  }
+  .resume-artifact-header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* The artifact document should use the full available panel width. Never
+   center a tiny transformed page inside a large empty panel. */
+.resume-artifact-preview {
+  padding: 12px !important;
+}
+.resume-artifact-preview > div {
+  width: 100% !important;
+}

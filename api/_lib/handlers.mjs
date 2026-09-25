@@ -326,7 +326,7 @@ ${referenceText || '(none)'}
 
 Return JSON only.`;
 }
-function sanitizeAgentResume(original, candidate){
+function sanitizeAgentResume(original, candidate, instructionForSanitize=''){
   const out=structuredClone(original);
   if(!candidate || typeof candidate!=='object') return out;
   const keep=(v,f)=>v===undefined?f:v;
@@ -349,7 +349,8 @@ function sanitizeAgentResume(original, candidate){
   out.customSections=Array.isArray(candidate.customSections)?candidate.customSections:structuredClone(original.customSections);
   out.sections=Array.isArray(candidate.sections)?candidate.sections:structuredClone(original.sections);
   out.colors=candidate.colors&&typeof candidate.colors==='object'?candidate.colors:structuredClone(original.colors);
-  out.template=Object.prototype.hasOwnProperty.call(TEMPLATE_NAMES,candidate.template)?candidate.template:original.template;
+  const explicitTemplateRequest=/\b(change|switch|use|apply|select|make)\b[^.\n]{0,80}\b(template|layout|design)\b/i.test(instructionForSanitize||'');
+  out.template=explicitTemplateRequest && Object.prototype.hasOwnProperty.call(TEMPLATE_NAMES,candidate.template) ? candidate.template : original.template;
   out.pageFormat=['a4','letter'].includes(candidate.pageFormat)?candidate.pageFormat:original.pageFormat;
   out.fontSize=['small','medium','large'].includes(candidate.fontSize)?candidate.fontSize:original.fontSize;
   out.fontFamily=typeof candidate.fontFamily==='string'&&candidate.fontFamily?candidate.fontFamily:original.fontFamily;
@@ -433,7 +434,7 @@ async function handleAgent(req,res){
       : await generateWithFallback(contents,agentSchema,{primary:'groq',timeoutMs:45000,includeGeminiFallback:true});
     const raw=result.data||{};
     const candidate=raw.resumeData||raw.tailoredResume||raw.resume||raw.result?.resumeData||raw.data?.resumeData;
-    const safeResume=sanitizeAgentResume(b.resumeData,candidate);
+    const safeResume=sanitizeAgentResume(b.resumeData,candidate,b.instruction.trim());
     sendJson(res,200,{resumeData:safeResume,intent:raw.intent||'edit',message:raw.message||'Resume updated.',analysis:raw.analysis||{},changes:Array.isArray(raw.changes)?raw.changes:[],provider:result.provider,model:result.model});
   }catch(e){console.error('Resume agent error:',e);sendJson(res,e.status||500,{error:e.message||'Resume Agent failed.'});}
 }

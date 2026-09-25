@@ -65,39 +65,39 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
     }
   };
 
-  // Calculate scale to fit within container
   const isA4 = resumeData.pageFormat === 'a4';
-  const pageWidth = isA4 ? 794 : 816; // A4: 210mm = 794px, Letter: 8.5in = 816px
-  const pageHeight = isA4 ? 1123 : 1056; // A4: 297mm = 1123px, Letter: 11in = 1056px
+  const pageWidth = isA4 ? 794 : 816;
+  const pageHeight = isA4 ? 1123 : 1056;
   const containerWidth = artifact ? hostWidth : 860;
-  const scaleWidth = Math.max(0.05, containerWidth / pageWidth);
-  // In the Created Resume artifact the ONLY sizing constraint is the panel
-  // width. The page is allowed to become taller than the viewport and the
-  // artifact scrolls vertically, exactly like a document/artifact viewer.
-  // Keep the artifact document readable at narrow widths. Below ~62% a full A4/Letter
-  // page becomes effectively unreadable; the artifact itself can still be resized
-  // to any width, while the document viewer scrolls horizontally when necessary.
-  const scale = artifact ? Math.min(1, Math.max(0.08, scaleWidth)) : Math.min(1, scaleWidth, 650 / pageHeight);
+  const scaleWidth = Math.max(0.2, Math.min(1, containerWidth / pageWidth));
+
+  // The artifact is a real document viewer. Its outer page follows the panel
+  // width and the inner A4/Letter document is scaled once. This avoids the old
+  // double-sizing path that produced a large blank white page with microscopic
+  // content when the artifact was resized.
+  const scale = scaleWidth;
+  const outerWidth = artifact ? Math.max(220, Math.floor(containerWidth)) : Math.floor(pageWidth * scale);
+  const outerHeight = artifact ? Math.ceil(pageHeight * scale) : Math.floor(pageHeight * scale);
 
   return (
-    <div ref={previewHostRef} className="w-full h-full flex items-center justify-center p-2">
-      <div 
-        className="bg-white rounded-lg shadow-xl overflow-visible origin-center"
+    <div ref={previewHostRef} className="w-full h-full flex items-start justify-center p-2" style={{overflowX: artifact ? 'hidden' : 'visible'}}>
+      <div
+        className="bg-white rounded-lg shadow-xl origin-top-left"
         style={{
-          width: pageWidth * scale,
-          height: pageHeight * scale,
-          maxWidth: 'none',
-          maxHeight: 'none',
-          flex: '0 0 auto'
+          width: outerWidth,
+          height: outerHeight,
+          maxWidth: '100%',
+          flex: '0 0 auto',
+          overflow: 'hidden'
         }}
       >
-        <div 
+        <div
           id="resume-content"
-          className="w-full h-full relative print:shadow-none print:rounded-none overflow-hidden"
-          style={{ 
+          className="relative print:shadow-none print:rounded-none overflow-hidden"
+          style={{
             width: isA4 ? '210mm' : '8.5in',
             height: isA4 ? '297mm' : '11in',
-            fontSize: '11px',
+            fontSize: artifact ? `${Math.max(11, 11 / scale)}px` : '11px',
             lineHeight: '1.35',
             fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
             padding: '0.75in',
