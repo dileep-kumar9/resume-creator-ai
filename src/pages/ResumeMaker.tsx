@@ -362,9 +362,10 @@ const AgentWorkspace:React.FC=()=>{
       const jd='Job Title: Agent Product Builder\nEnd-to-End Agent Development and applied data science. Work with Python, SQL, data transformation, unstructured data processing, dashboards, anomaly identification and data analytics. Build autonomous AI agents and solve ambiguous technical problems.';
       promptRef.current=jd; setPrompt(jd);
       await new Promise(r=>setTimeout(r,80));
-      const beforeTailor=resumeDataRef.current;
+      const beforeTailor=structuredClone(resumeDataRef.current);
+      const messageCountBeforeTailor=getSnapshot().messageCount;
       await send();
-      const tailoredSnapshot=await waitForSnapshot((x:any)=>x.resumeCounts.experience>0 && x.resumeCounts.projects>0 && x.resumeCounts.education>0 && x.resumeCounts.skills>0 && x.selectedTemplate==='original-upload',7000);
+      const tailoredSnapshot=await waitForSnapshot((x:any)=>!x.loading && x.messageCount>messageCountBeforeTailor && x.resumeCounts.experience>0 && x.resumeCounts.projects>0 && x.resumeCounts.education>0 && x.resumeCounts.skills>0 && x.selectedTemplate==='original-upload',12000);
       const tailoredData=(window as any).__RESUME_STUDIO_CONTROL__?.getResumeData?.() || resumeDataRef.current;
       check('Resume tailoring through chat completed',tailoredSnapshot.resumeCounts.experience>0 && tailoredSnapshot.resumeCounts.projects>0 && tailoredSnapshot.resumeCounts.education>0 && tailoredSnapshot.resumeCounts.skills>0,JSON.stringify(tailoredSnapshot.resumeCounts));
       check('Tailoring keeps original template',tailoredSnapshot.selectedTemplate==='original-upload',`template=${tailoredSnapshot.selectedTemplate}`);

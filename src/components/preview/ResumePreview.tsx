@@ -33,7 +33,7 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   if (visualTemplate === 'original-upload' && resumeData.originalTemplate?.sourceDataUrl && !resumeData.originalTemplate.tailored) {
     return (
       <div ref={previewHostRef} className="w-full h-full flex items-center justify-center p-2">
-        <div id="resume-content" className="w-full h-full bg-white shadow-xl overflow-hidden">
+        <div id="resume-content" data-control="resume-rendered" className="w-full h-full bg-white shadow-xl overflow-hidden">
           {resumeData.originalTemplate.sourceFormat === 'pdf' ? (
             <iframe title="Original uploaded resume" src={resumeData.originalTemplate.sourceDataUrl} className="w-full h-full border-0" />
           ) : (

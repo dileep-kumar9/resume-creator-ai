@@ -20,51 +20,71 @@ export const TemplateSelector: React.FC = () => {
         <CardTitle>Choose Template</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {state.resumeData.originalTemplate && (
-          <Card className={`border-2 ${selectedTemplate === 'original-upload' ? 'border-primary ring-2 ring-primary/30' : 'border-dashed'}`}>
+        <Card
+            className={`border-2 overflow-hidden cursor-pointer transition-all ${selectedTemplate === 'original-upload' ? 'border-primary ring-2 ring-primary/30' : 'border-dashed hover:border-primary/50'}`}
+            onClick={() => state.resumeData.originalTemplate && updateTemplate('original-upload')}
+          >
+            <div className="relative bg-muted/30 border-b">
+              <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
+                <Badge className="bg-background/95 text-foreground border shadow-sm">Original uploaded template</Badge>
+                <Badge variant="outline" className="bg-background/95 text-foreground">
+                  {state.resumeData.originalTemplate?.sourceFormat?.toUpperCase() || 'PDF'}
+                </Badge>
+              </div>
+              {selectedTemplate === 'original-upload' && (
+                <div className="absolute right-3 top-3 z-10 rounded-full bg-primary p-1.5 text-primary-foreground shadow">
+                  <Check className="w-4 h-4" />
+                </div>
+              )}
+              <div className="h-64 w-full overflow-hidden bg-white flex items-center justify-center">
+                {(state.resumeData.originalTemplate?.sourceFormat === 'pdf' && state.resumeData.originalTemplate.sourceDataUrl) || !state.resumeData.originalTemplate ? (
+                  <iframe
+                    title="Original uploaded resume template preview"
+                    src={state.resumeData.originalTemplate?.sourceDataUrl || '/templates/badham-dileep-kumar-original-resume.pdf'}
+                    className="h-full w-full border-0 pointer-events-none"
+                  />
+                ) : (
+                  <div className="px-6 text-center text-sm text-muted-foreground">
+                    <div className="mx-auto mb-2 w-12 h-14 rounded border bg-white flex items-center justify-center">
+                      <span className="text-xs font-semibold">PDF</span>
+                    </div>
+                    Preview is preserved when the original document is opened.
+                  </div>
+                )}
+              </div>
+            </div>
             <CardContent className="p-4">
               <div className="space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
                     <h3 className="font-semibold text-base">Original Uploaded Resume</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Preserved from {state.resumeData.originalTemplate.sourceFileName}. Keep the uploaded design as your reference, or switch to a built-in editable template.
+                    <p className="text-sm text-muted-foreground mt-1 break-words">
+                      {state.resumeData.originalTemplate?.sourceFileName || 'Badham Dileep Kumar — Original Resume'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      This is your original resume design. It is kept as a first-class template and is never replaced automatically by AI tailoring.
                     </p>
                   </div>
-                  {selectedTemplate === 'original-upload' && <Check className="w-5 h-5 text-primary" />}
                 </div>
-                <Badge variant="outline" className="text-xs">Imported {state.resumeData.originalTemplate.sourceFormat.toUpperCase()}</Badge>
-                {state.resumeData.originalTemplate.tailored && (
+                {state.resumeData.originalTemplate?.tailored && (
                   <div className="rounded-md bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-muted-foreground">
-                    Original uploaded template remains selected. Tailoring changed the resume data only; choose a built-in template yourself if you want the tailored content rendered in an editable layout.
+                    Tailored resume data is currently rendered using the original-style editable layout.
                   </div>
                 )}
                 <Button
                   variant={selectedTemplate === 'original-upload' ? 'default' : 'outline'}
+                  disabled={!state.resumeData.originalTemplate}
                   size="sm"
                   className="w-full"
-                  onClick={() => updateTemplate('original-upload')}
+                  onClick={(e) => { e.stopPropagation(); if (state.resumeData.originalTemplate) updateTemplate('original-upload'); }}
                 >
-                  {selectedTemplate === 'original-upload' ? 'Original Selected' : 'Use Original'}
+                  {selectedTemplate === 'original-upload' ? (
+                    <><Check className="w-4 h-4 mr-2" />Original Selected</>
+                  ) : state.resumeData.originalTemplate ? 'Use Original' : 'Upload Resume to Activate'}
                 </Button>
               </div>
             </CardContent>
           </Card>
-        )}
-
-        {!state.resumeData.originalTemplate && (
-          <Card className="border-2 border-dashed">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-semibold text-base">Original Uploaded Resume</h3>
-                  <p className="text-sm text-muted-foreground mt-1">Upload a PDF or DOCX to preserve the original document as a selectable template. It will never be replaced automatically.</p>
-                </div>
-                <Badge variant="outline">Not uploaded</Badge>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {TEMPLATE_CONFIGS.map((template) => (
