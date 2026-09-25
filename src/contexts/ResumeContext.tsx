@@ -180,9 +180,17 @@ const loadPersistedState = (): ResumeState => {
     const name=String(parsed.personalInfo?.fullName||'').toLowerCase();
     const email=String(parsed.personalInfo?.email||'').toLowerCase();
     const source=String(parsed.originalTemplate?.sourceFileName||'').toLowerCase();
+    const projects = Array.isArray(parsed.projects) ? parsed.projects : [];
+    const experience = Array.isArray(parsed.experience) ? parsed.experience : [];
+    // Reject the unrelated sample resume that was accidentally bundled with
+    // older builds. Never let that sample become the user's starting artifact.
+    const unrelatedSample = email === 'afifahmad718@gmail.com' ||
+      name.includes('mustahoshin hossain ahamed afif') ||
+      experience.some((x:any) => /systemsage solutions|nestron house/i.test(String(x.company||''))) ||
+      projects.some((x:any) => /systemsage solutions/i.test(String(x.title||'')));
     const seededDefault = source === 'badham_dileep_kumar_updated_resume.pdf' &&
-      (parsed.projects || []).some((p:any) => ['ai-career-assistant','samurai-reimei'].includes(String(p.id||'')));
-    if (seededDefault) {
+      projects.some((p:any) => ['ai-career-assistant','samurai-reimei'].includes(String(p.id||'')));
+    if (seededDefault || unrelatedSample) {
       window.localStorage.removeItem('resume-studio-resume-data');
       return initialState;
     }

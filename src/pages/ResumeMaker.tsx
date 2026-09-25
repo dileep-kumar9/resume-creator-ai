@@ -186,7 +186,9 @@ const AgentWorkspace:React.FC=()=>{
         const email=String(data.personalInfo?.email||'').toLowerCase();
         const source=String(data.originalTemplate?.sourceFileName||'').toLowerCase();
         const company=(data.experience||[]).map(x=>String(x.company||'').toLowerCase()).join(' ');
-        return email==='e2e@example.com' || name.includes('e2e test') || source.includes('e2e-test-resume') || company.includes('example technologies');
+        const projects=(data.projects||[]).map(x=>String(x.title||'').toLowerCase()).join(' ');
+        const unrelatedSample=email==='afifahmad718@gmail.com' || name.includes('mustahoshin hossain ahamed afif') || /systemsage solutions|nestron house/.test(company) || projects.includes('systemsage solutions');
+        return email==='e2e@example.com' || name.includes('e2e test') || source.includes('e2e-test-resume') || company.includes('example technologies') || unrelatedSample;
       };
       // Synthetic fixtures are test-only. If one leaked into persisted state from
       // an older E2E run, never use it for a real chat request.

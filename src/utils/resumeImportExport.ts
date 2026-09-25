@@ -77,8 +77,8 @@ export async function importResumeFromFile(file: File, useAI = true): Promise<Re
     };
     return {
       ...data,
-      colors: { ...data.colors, primary: '#4F8CC9', secondary: '#4b5563', text: '#222222', background: '#ffffff' },
-      fontFamily: 'Helvetica',
+      colors: { ...data.colors, primary: '#262626', secondary: '#444444', accent: '#262626', text: '#222222', background: '#ffffff' },
+      fontFamily: 'Arial',
       fontSize: 'medium',
       pageFormat: 'letter',
       template: 'original-upload',
