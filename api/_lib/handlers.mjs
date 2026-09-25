@@ -295,7 +295,7 @@ const TEMPLATE_NAMES={
   'creative-modern':'Creative Modern',
   'bjet-professional':'B-JET Professional'
 };
-function agentPrompt(resumeData,instruction,referenceText=''){
+function agentPrompt(resumeData,instruction,referenceText='',conversation=[]){
   return `You are the Resume Agent inside a professional resume editor. The user can speak to you naturally, like ChatGPT/Gemini. Your job is to understand the user's instruction and perform the requested resume operation, not merely give advice.
 
 SUPPORTED OPERATIONS (you may combine them):
@@ -308,6 +308,8 @@ SUPPORTED OPERATIONS (you may combine them):
 - Change font, page format, or colors when requested.
 - Use an uploaded reference resume as a style/layout reference and choose the closest built-in template. Preserve the candidate's own content; do not copy the reference person's facts.
 - Perform combinations such as “tailor this to the JD and make it one page using this reference style”.
+- Understand follow-up references such as “that project”, “undo that”, and “make it shorter” using the recent conversation supplied below. Treat the current instruction as authoritative.
+- When the user explicitly asks to add/remove/reorder a project, internship/experience, education item, skill, or section, apply that operation to the structured data. For additions, use only details the user supplied; if essential facts are missing, ask for clarification in the response and do not invent them.
 
 AVAILABLE EDITABLE TEMPLATES:
 ${JSON.stringify(TEMPLATE_NAMES)}
@@ -339,6 +341,9 @@ IMPORTANT OUTPUT BEHAVIOR:
 - If the user only asks a question and no resume modification is requested, return the current resume unchanged and explain the answer in message.
 - For a JD, provide useful analysis including strengths, genuine gaps, matched and missing keywords.
 
+RECENT CONVERSATION (oldest to newest; use only to resolve context, not as evidence for new resume facts):
+${JSON.stringify(Array.isArray(conversation) ? conversation.slice(-12) : [])}
+
 CURRENT RESUME:
 ${JSON.stringify({...resumeData,originalTemplate:resumeData.originalTemplate?{sourceFileName:resumeData.originalTemplate.sourceFileName,sourceFormat:resumeData.originalTemplate.sourceFormat}:undefined})}
 
@@ -357,16 +362,16 @@ function sanitizeAgentResume(original, candidate, instructionForSanitize=''){
   // AI may change editable content, ordering and design, but immutable factual identity fields
   // are restored from the current resume unless the user explicitly edits them in the editor.
   out.personalInfo={...structuredClone(original.personalInfo),jobTitle:(candidate.personalInfo&&typeof candidate.personalInfo.jobTitle==='string'&&candidate.personalInfo.jobTitle.trim())?candidate.personalInfo.jobTitle.trim():original.personalInfo.jobTitle};
-  out.experience=(original.experience||[]).map((o,i)=>{
-    const e=Array.isArray(candidate.experience)?candidate.experience[i]:null;
-    return {...o,jobTitle:o.jobTitle,company:o.company,location:o.location,startDate:o.startDate,endDate:o.endDate,current:o.current,description:keep(e?.description,o.description),bulletPoints:Array.isArray(e?.bulletPoints)?e.bulletPoints:o.bulletPoints};
-  });
-  out.education=structuredClone(original.education);
-  out.projects=(original.projects||[]).map((o,i)=>{const p=Array.isArray(candidate.projects)?candidate.projects[i]:null;return {...o,title:o.title,technologies:o.technologies,liveUrl:o.liveUrl,githubUrl:o.githubUrl,startDate:o.startDate,endDate:o.endDate,description:keep(p?.description,o.description)};});
+  const explicitCollectionEdit = /\b(add|remove|delete|reorder|move|replace|keep only)\b/i.test(instructionForSanitize||'');
+  const mergeExperience = (items) => (Array.isArray(items)?items:[]).map((e,i)=>{ const old=(original.experience||[]).find(o=>o.id && o.id===e?.id) || (original.experience||[])[i]; return old ? {...old,description:keep(e?.description,old.description),bulletPoints:Array.isArray(e?.bulletPoints)?e.bulletPoints:old.bulletPoints} : {...e,id:e?.id||`exp-${Date.now()}-${i}`,jobTitle:String(e?.jobTitle||''),company:String(e?.company||''),location:String(e?.location||''),startDate:String(e?.startDate||''),endDate:String(e?.endDate||''),current:Boolean(e?.current),description:String(e?.description||''),bulletPoints:Array.isArray(e?.bulletPoints)?e.bulletPoints:[]}; });
+  out.experience=explicitCollectionEdit && Array.isArray(candidate.experience) ? mergeExperience(candidate.experience) : (original.experience||[]).map((o,i)=>{const e=Array.isArray(candidate.experience)?candidate.experience[i]:null;return {...o,description:keep(e?.description,o.description),bulletPoints:Array.isArray(e?.bulletPoints)?e.bulletPoints:o.bulletPoints};});
+  out.education=explicitCollectionEdit && Array.isArray(candidate.education) ? candidate.education.map((e,i)=>{const old=(original.education||[]).find(o=>o.id&&o.id===e?.id)||(original.education||[])[i];return old?{...old}:{...e,id:e?.id||`edu-${Date.now()}-${i}`};}) : structuredClone(original.education);
+  out.projects=explicitCollectionEdit && Array.isArray(candidate.projects) ? candidate.projects.map((p,i)=>{const old=(original.projects||[]).find(o=>o.id&&o.id===p?.id)||(original.projects||[])[i];return old?{...old,description:keep(p?.description,old.description)}:{...p,id:p?.id||`project-${Date.now()}-${i}`,title:String(p?.title||''),description:String(p?.description||''),technologies:Array.isArray(p?.technologies)?p.technologies:[],liveUrl:'',githubUrl:'',startDate:'',endDate:''};}) : (original.projects||[]).map((o,i)=>{const p=Array.isArray(candidate.projects)?candidate.projects[i]:null;return {...o,description:keep(p?.description,o.description)};});
   out.summary=typeof candidate.summary==='string'?candidate.summary:original.summary;
   if(candidate.skills&&typeof candidate.skills==='object'){
     const allowed=new Set(collectSkills(original.skills).map(x=>String(x).toLowerCase()));
-    const clean=(x)=>Array.isArray(x)?x.filter(v=>allowed.has(String(v).toLowerCase())):[];
+    const explicitSkillEdit=/\b(add|remove|delete|reorder|prioriti[sz]e|adjust)\b[^.\n]{0,80}\bskills?\b|\bskills?\b[^.\n]{0,80}\b(add|remove|delete|reorder|prioriti[sz]e|adjust)\b/i.test(instructionForSanitize||'');
+    const clean=(x)=>Array.isArray(x)?x.filter(v=>typeof v==='string'&&(explicitSkillEdit||allowed.has(v.toLowerCase()))):[];
     if(original.skills.mode==='simple') out.skills={...original.skills,simple:clean(candidate.skills.simple)};
     else out.skills={...original.skills,categorized:(original.skills.categorized||[]).map((c,i)=>({...c,skills:clean(candidate.skills.categorized?.[i]?.skills)}))};
   } else out.skills=structuredClone(original.skills);
@@ -401,12 +406,12 @@ async function handleAgent(req,res){
       }
     }
     let referenceText=typeof b.referenceText==='string'?b.referenceText.trim():'';
-    let contents=[{parts:[{text:agentPrompt(b.resumeData,b.instruction.trim(),referenceText)}]}];
+    let contents=[{parts:[{text:agentPrompt(b.resumeData,b.instruction.trim(),referenceText,b.conversation)}]}];
     // When a PDF reference is supplied, use Gemini's native PDF input so the agent can reason
     // about the reference document's visual/structural cues instead of only extracted text.
     const hasPdf=typeof b.referencePdfBase64==='string'&&b.referencePdfBase64.length>100;
     if(hasPdf){
-      contents=[{parts:[{inlineData:{mimeType:'application/pdf',data:b.referencePdfBase64}},{text:agentPrompt(b.resumeData,b.instruction.trim(),referenceText+'\n[The attached PDF is the visual reference. Inspect its layout/style as well as its text. Use it only as a design reference unless the user explicitly asks for factual extraction.]')}]}];
+      contents=[{parts:[{inlineData:{mimeType:'application/pdf',data:b.referencePdfBase64}},{text:agentPrompt(b.resumeData,b.instruction.trim(),referenceText+'\n[The attached PDF is the visual reference. Inspect its layout/style as well as its text. Use it only as a design reference unless the user explicitly asks for factual extraction.]',b.conversation)}]}];
     }
     const requestedTailor=looksLikeJobDescription(b.instruction);
     const contentFingerprint=x=>JSON.stringify({jobTitle:x?.personalInfo?.jobTitle||'',summary:x?.summary||'',experience:(x?.experience||[]).map(e=>e.bulletPoints||[]),projects:(x?.projects||[]).map(p=>p.description||''),skills:collectSkills(x?.skills)});
