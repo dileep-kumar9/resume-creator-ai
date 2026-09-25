@@ -333,7 +333,7 @@ REFERENCE HANDLING:
 
 IMPORTANT OUTPUT BEHAVIOR:
 - Actually perform the requested changes in resumeData.
-- A tailoring request is NOT successful if resumeData is effectively unchanged. For a JD-tailoring request, the professional summary MUST be newly written for the target role, and existing experience/project bullets or descriptions MUST be rewritten wherever their facts can truthfully be connected to the JD. Reorder existing skills by relevance. Do not merely return the source resume.
+- A tailoring request is NOT successful if resumeData is effectively unchanged. For a JD-tailoring request, the professional summary MUST be newly written for the target role, and existing experience/project bullets or descriptions MUST be rewritten wherever their facts can truthfully be connected to the JD. Reorder existing skills by relevance. Do not merely return the source resume. If there is no job description or no actual content change was made, say that clearly; never claim a template/color/content change unless the corresponding resumeData field actually changed.
 - Prefer concrete reframing over generic preservation: if the source says an AI project parses unstructured data, emphasize unstructured-data processing and structured reporting when the JD values those concepts; if the source says Python/SQL/data analysis/AWS, foreground those capabilities when relevant. This is rewriting, not invention.
 - The professional headline/jobTitle may be changed only as a positioning headline when it is not an employer-held role; never falsify an employment title.
 - Return a concise message describing what you changed.
@@ -377,7 +377,8 @@ function sanitizeAgentResume(original, candidate, instructionForSanitize=''){
   } else out.skills=structuredClone(original.skills);
   out.customSections=Array.isArray(candidate.customSections)?candidate.customSections:structuredClone(original.customSections);
   out.sections=Array.isArray(candidate.sections)?candidate.sections:structuredClone(original.sections);
-  out.colors=candidate.colors&&typeof candidate.colors==='object'?candidate.colors:structuredClone(original.colors);
+  const explicitColorRequest=/\b(colou?r|palette|heading colour|heading color|font colour|font color)\b/i.test(instructionForSanitize||'');
+  out.colors=explicitColorRequest && candidate.colors&&typeof candidate.colors==='object'?candidate.colors:structuredClone(original.colors);
   const explicitTemplateRequest=/\b(change|switch|use|apply|select|make)\b[^.\n]{0,80}\b(template|layout|design)\b/i.test(instructionForSanitize||'');
   out.template=explicitTemplateRequest && Object.prototype.hasOwnProperty.call(TEMPLATE_NAMES,candidate.template) ? candidate.template : original.template;
   out.pageFormat=['a4','letter'].includes(candidate.pageFormat)?candidate.pageFormat:original.pageFormat;

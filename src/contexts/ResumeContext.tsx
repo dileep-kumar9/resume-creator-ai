@@ -200,7 +200,15 @@ const loadPersistedState = (): ResumeState => {
       window.localStorage.removeItem('resume-studio-resume-data');
       return initialState;
     }
-    return { ...initialState, resumeData: parsed };
+    // Migrate legacy imported resumes that retained blue styling/Helvetica.
+    // This keeps an already-saved uploaded resume consistent with fresh imports.
+    const migrated = parsed.originalTemplate ? {
+      ...parsed,
+      colors: { ...DEFAULT_COLORS, primary: '#262626', secondary: '#444444', accent: '#262626', text: '#222222', background: '#ffffff' },
+      fontFamily: 'Arial',
+      template: 'original-upload' as const,
+    } : parsed;
+    return { ...initialState, resumeData: migrated };
   } catch {
     return initialState;
   }

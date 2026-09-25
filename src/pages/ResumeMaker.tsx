@@ -207,13 +207,19 @@ const AgentWorkspace:React.FC=()=>{
       // accidentally sent only as a visual reference, leaving the AI with an
       // empty resume object. An existing parsed resume is never overwritten by
       // a reference attachment.
+      const explicitVisualReference = /\b(use|treat|keep)\b[^.\n]{0,60}\b(as|for)\b[^.\n]{0,30}\b(visual|design|style|layout)\s+reference\b|\bmake mine look like this\b/i.test(currentPrompt);
+      const filenameLooksLikeResume = currentAttachment ? /\b(resume|cv|curriculum vitae)\b/i.test(currentAttachment.name) : false;
+      // A resume-named attachment is the source resume even when an old/default
+      // resume is already loaded. Previously the non-empty default state caused
+      // this file to be treated as a reference, leaving the stale artifact live.
       const shouldImportAttachedResume=Boolean(
-        currentAttachment &&
-        (currentAttachmentKind==='resume' || (resumeCoreCount(workingResume)===0 && looksLikeResumeAttachment(currentAttachment)))
+        currentAttachment && !explicitVisualReference &&
+        (currentAttachmentKind==='resume' || filenameLooksLikeResume || (resumeCoreCount(workingResume)===0 && looksLikeResumeAttachment(currentAttachment)))
       );
 
       if(currentAttachment && shouldImportAttachedResume){
         workingResume=await importResumeFromFile(currentAttachment,!currentAttachment.name.toLowerCase().endsWith('.json'));
+        workingResume={...workingResume,colors:{...workingResume.colors,primary:'#262626',secondary:'#444444',accent:'#262626',text:'#222222',background:'#ffffff'},fontFamily:'Arial',template:'original-upload'};
         if(resumeCoreCount(workingResume)===0){
           throw new Error('The uploaded resume could not be parsed into experience, projects, education, or skills. Please verify the file contains selectable text.');
         }

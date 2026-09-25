@@ -96,9 +96,9 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
             height: 'auto',
             fontSize: `${resumeData.fontSize === 'small' ? 10.5 : resumeData.fontSize === 'large' ? 12.5 : 11}px`,
             lineHeight: '1.35',
-            fontFamily: `${resumeData.fontFamily || 'Helvetica'}, Arial, Helvetica, sans-serif`,
+            fontFamily: `${resumeData.fontFamily || 'Arial'}, Arial, Helvetica, sans-serif`,
             padding: '0.75in',
-            color: '#1f2937',
+            color: resumeData.colors?.text || '#222222',
             boxSizing: 'border-box',
             transform: `scale(${scale})`,
             transformOrigin: 'top left'
