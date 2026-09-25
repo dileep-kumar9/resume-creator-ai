@@ -46,7 +46,9 @@ Rules:
 Resume text/content follows:\n${text}`; }
 const tailorSchema={type:'object',properties:{analysis:{type:'object',properties:{summary:{type:'string'},strengths:{type:'array',items:{type:'string'}},gaps:{type:'array',items:{type:'string'}},matchedKeywords:{type:'array',items:{type:'string'}},missingKeywords:{type:'array',items:{type:'string'}},recommendations:{type:'array',items:{type:'string'}}},required:['summary','strengths','gaps','matchedKeywords','missingKeywords','recommendations']},tailoredResume:{type:'object',properties:{summary:{type:'string'},experienceBulletPoints:{type:'array',items:{type:'array',items:{type:'string'}}},projectDescriptions:{type:'array',items:{type:'string'}},skillsOrder:{type:'array',items:{type:'string'}},customSections:{type:'array',items:{type:'object',properties:{title:{type:'string'},content:{type:'string'}},required:['title','content']}}},required:['summary','experienceBulletPoints','projectDescriptions','skillsOrder','customSections']}},required:['analysis','tailoredResume']};
 function compactResume(r){return {summary:r.summary||'',experience:(r.experience||[]).map(e=>({jobTitle:e.jobTitle,company:e.company,location:e.location,startDate:e.startDate,endDate:e.endDate,current:e.current,description:e.description||'',bulletPoints:e.bulletPoints||[]})),projects:(r.projects||[]).map(p=>({title:p.title,description:p.description,technologies:p.technologies||[],liveUrl:p.liveUrl||'',githubUrl:p.githubUrl||''})),skills:collectSkills(r.skills),education:r.education||[],customSections:(r.customSections||[]).filter(s=>s.visible!==false).map(s=>({title:s.title,content:s.content}))};}
-function tailorPrompt(resumeData,jd){return `Act as a senior resume analyst and ATS resume writer. Analyze the candidate against the job description and then create a genuinely tailored version of the existing resume.
+function tailorPrompt(resumeData,jd){return `Act as a senior resume analyst and ATS resume writer, working like a conversational resume editor. Analyze the candidate against the job description and then create a genuinely tailored version of the existing resume.
+
+IDENTITY AND HEADER: The candidate's name is ${JSON.stringify(resumeData?.personalInfo?.fullName||'')}. Preserve this exact full name and keep it as the first/top heading of the resume. Never replace it with the target job title, a sample candidate, or a placeholder. Preserve email, phone, location, portfolio and LinkedIn exactly. The target role may be used as the professional headline only; never change an actual employment title.
 
 FACTUAL INTEGRITY IS ABSOLUTE:
 - Use ONLY facts supported by the candidate resume. Never invent or imply an employer, title, date, degree, certification, technology, responsibility, metric, project, tool or achievement.
@@ -231,10 +233,14 @@ function localTailorResume(original, jobDescription) {
   return result;
 }
 
-function applyTailoring(original,ai){
+function applyTailoring(original,ai,jobDescription=''){ 
   const normalized=normalizeTailoring(ai);
   if(!normalized) throw new Error('AI returned JSON, but no usable tailored resume was found.');
   const result=structuredClone(original); const t=normalized.tailoredResume;
+  // Identity is immutable during tailoring; the candidate's name remains the resume's top heading.
+  result.personalInfo=structuredClone(original.personalInfo);
+  const targetTitle=String(jobDescription).match(/(?:^|[\n\r])\s*[*_#\s]*job\s*title\s*[:：-]\s*([^\n\r*]+)/i)?.[1]?.replace(/[*_]+/g,'').trim();
+  if(targetTitle && targetTitle.length<=100) result.personalInfo.jobTitle=targetTitle;
   if(typeof t.summary==='string'&&t.summary.trim()) result.summary=t.summary.trim();
   if(Array.isArray(t.experienceBulletPoints) && t.experienceBulletPoints.length === (original.experience||[]).length) {
     result.experience=(original.experience||[]).map((x,i)=>{
@@ -367,12 +373,19 @@ function sanitizeAgentResume(original, candidate, instructionForSanitize=''){
   out.originalTemplate=original.originalTemplate;
   return out;
 }
+function looksLikeJobDescription(value='') {
+  const text=String(value||'');
+  if (/\b(tailor|job description|\bjd\b|ats|match (?:this|the) (?:role|job))\b/i.test(text)) return true;
+  const signals=[/\bjob title\b/i,/\brole overview\b/i,/\bkey responsibilities\b/i,/\brequirements\b/i,/\bkey skills\b/i,/\bwhat you.?ll do\b/i,/\bqualifications\b/i,/\babout us\b/i];
+  return text.length>=500 && signals.filter(re=>re.test(text)).length>=2;
+}
+
 async function handleAgent(req,res){
   try{
     const b=await readBody(req,12_000_000);
     if(!b.resumeData||typeof b.resumeData!=='object') return sendJson(res,400,{error:'Resume data is required.'});
     if(typeof b.instruction!=='string'||b.instruction.trim().length<2) return sendJson(res,400,{error:'Please tell the Resume Agent what you want it to do.'});
-    const requestLooksLikeTailoring=/tailor|job description|\bjd\b|ats|match (?:this|the) (?:role|job)/i.test(b.instruction);
+    const requestLooksLikeTailoring=looksLikeJobDescription(b.instruction);
     if(requestLooksLikeTailoring){
       const counts={experience:Array.isArray(b.resumeData.experience)?b.resumeData.experience.length:0,projects:Array.isArray(b.resumeData.projects)?b.resumeData.projects.length:0,education:Array.isArray(b.resumeData.education)?b.resumeData.education.length:0,skills:collectSkills(b.resumeData.skills).length};
       if(counts.experience+counts.projects+counts.education+counts.skills===0){
@@ -387,7 +400,7 @@ async function handleAgent(req,res){
     if(hasPdf){
       contents=[{parts:[{inlineData:{mimeType:'application/pdf',data:b.referencePdfBase64}},{text:agentPrompt(b.resumeData,b.instruction.trim(),referenceText+'\n[The attached PDF is the visual reference. Inspect its layout/style as well as its text. Use it only as a design reference unless the user explicitly asks for factual extraction.]')}]}];
     }
-    const requestedTailor=/tailor|job description|\bjd\b|ats|match (?:this|the) (?:role|job)/i.test(b.instruction);
+    const requestedTailor=looksLikeJobDescription(b.instruction);
     const contentFingerprint=x=>JSON.stringify({jobTitle:x?.personalInfo?.jobTitle||'',summary:x?.summary||'',experience:(x?.experience||[]).map(e=>e.bulletPoints||[]),projects:(x?.projects||[]).map(p=>p.description||''),skills:collectSkills(x?.skills)});
 
     // JD tailoring gets a dedicated resume-writing pass instead of relying on the
@@ -406,10 +419,10 @@ async function handleAgent(req,res){
       let fallbackUsed=false;
       try {
         tailoredResult=await tryTailor(basePrompt,'groq');
-        try { tailoredResume=applyTailoring(b.resumeData,tailoredResult.data); } catch(e) { tailoredResume=null; }
+        try { tailoredResume=applyTailoring(b.resumeData,tailoredResult.data,b.instruction.trim()); } catch(e) { tailoredResume=null; }
         if(!tailoredResume || contentFingerprint(tailoredResume)===contentFingerprint(b.resumeData)){
           tailoredResult=await tryTailor(retryPrompt,'mistral');
-          try { tailoredResume=applyTailoring(b.resumeData,tailoredResult.data); } catch(e) { tailoredResume=null; }
+          try { tailoredResume=applyTailoring(b.resumeData,tailoredResult.data,b.instruction.trim()); } catch(e) { tailoredResume=null; }
         }
       } catch (providerError) {
         console.warn('AI tailoring providers unavailable; using safe local tailoring fallback:', providerError?.message || providerError);
@@ -447,5 +460,5 @@ async function handleAgent(req,res){
   }catch(e){console.error('Resume agent error:',e);sendJson(res,e.status||500,{error:e.message||'Resume Agent failed.'});}
 }
 
-async function handleTailor(req,res){try{const b=await readBody(req,4_000_000);if(!b.resumeData||typeof b.resumeData!=='object')return sendJson(res,400,{error:'Resume data is required.'});if(typeof b.jobDescription!=='string'||b.jobDescription.trim().length<40)return sendJson(res,400,{error:'Please provide a complete job description.'});const result=await generateWithFallback([{parts:[{text:tailorPrompt(b.resumeData,b.jobDescription.trim())}]}],tailorSchema,{primary:'groq',timeoutMs:35000});sendJson(res,200,{resumeData:applyTailoring(b.resumeData,result.data),analysis:result.data.analysis,matchedKeywords:result.data.analysis?.matchedKeywords||extractKeywords(b.jobDescription),provider:result.provider,model:result.model});}catch(e){console.error('AI tailor error:',e);sendJson(res,e.status||500,{error:e.message||'Failed to tailor resume.'});}}
+async function handleTailor(req,res){try{const b=await readBody(req,4_000_000);if(!b.resumeData||typeof b.resumeData!=='object')return sendJson(res,400,{error:'Resume data is required.'});if(typeof b.jobDescription!=='string'||b.jobDescription.trim().length<40)return sendJson(res,400,{error:'Please provide a complete job description.'});const result=await generateWithFallback([{parts:[{text:tailorPrompt(b.resumeData,b.jobDescription.trim())}]}],tailorSchema,{primary:'groq',timeoutMs:35000});sendJson(res,200,{resumeData:applyTailoring(b.resumeData,result.data,b.jobDescription.trim()),analysis:result.data.analysis,matchedKeywords:result.data.analysis?.matchedKeywords||extractKeywords(b.jobDescription),provider:result.provider,model:result.model});}catch(e){console.error('AI tailor error:',e);sendJson(res,e.status||500,{error:e.message||'Failed to tailor resume.'});}}
 export { handleParseResume, handleTailor, handleAgent };

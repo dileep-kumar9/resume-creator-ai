@@ -250,6 +250,19 @@ const AgentWorkspace:React.FC=()=>{
 
       setHistory(h=>[...h,structuredClone(workingResume)]);
       const next = normalizeParsedResume(result.resumeData as ResumeData, workingResume);
+      // The candidate's identity is never rewritten by AI. Keep the imported name
+      // (rendered as the top resume heading) and contact links from the source resume.
+      next.personalInfo = {
+        ...next.personalInfo,
+        ...workingResume.personalInfo,
+        fullName: workingResume.personalInfo.fullName || next.personalInfo.fullName || '',
+        email: workingResume.personalInfo.email || next.personalInfo.email || '',
+        phone: workingResume.personalInfo.phone || next.personalInfo.phone || '',
+        location: workingResume.personalInfo.location || next.personalInfo.location || '',
+        website: workingResume.personalInfo.website || next.personalInfo.website || '',
+        linkedin: workingResume.personalInfo.linkedin || next.personalInfo.linkedin || '',
+        github: workingResume.personalInfo.github || next.personalInfo.github || '',
+      };
 
       // HARD RULE: the uploaded document is immutable metadata. AI responses
       // are never allowed to replace the selected template or the original

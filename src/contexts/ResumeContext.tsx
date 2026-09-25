@@ -28,33 +28,79 @@ type ResumeAction =
 
 const initialResumeData: ResumeData = {
   personalInfo: {
-    fullName: '',
-    jobTitle: '',
-    email: '',
-    phone: '',
-    location: '',
-    website: '',
-    linkedin: '',
+    fullName: 'BADHAM DILEEP KUMAR',
+    jobTitle: 'B.Tech — Information Technology | Fresher',
+    email: 'dileepkumarbadham@gmail.com',
+    phone: '9542167927',
+    location: 'Tadepalligudem, Andhra Pradesh',
+    website: 'https://dileep-kumar9.github.io/',
+    linkedin: 'https://linkedin.com/in/dileep-kumar-badham',
     github: '',
     profileImage: '',
     birthDate: ''
   },
-  summary: '',
-  experience: [],
-  education: [],
-  projects: [],
+  summary: 'B.Tech Information Technology graduate with hands-on experience developing Python-based applications, web platforms, AI-assisted tools, and API integrations. Skilled in Python, SQL, Flask, Django, FastAPI, data processing, and application development. Seeking an entry-level opportunity to apply technical, analytical, and problem-solving skills while contributing to a collaborative team.',
+  experience: [{
+    id: 'brainovision-internship',
+    jobTitle: 'AWS / Cloud Computing Intern',
+    company: 'BrainOvision',
+    location: '',
+    startDate: '2024',
+    endDate: '2024',
+    current: false,
+    description: '',
+    bulletPoints: [
+      'Gained hands-on exposure to Amazon Web Services (AWS) fundamentals and cloud computing concepts.',
+      'Worked on cloud-based storage and deployment basics, building a practical foundation in AWS services such as S3.'
+    ]
+  }],
+  education: [
+    { id: 'btech-it', degree: 'Bachelor of Technology, Information Technology', institution: 'Sir C. R. Reddy College of Engineering', location: 'Eluru · JNTUK', graduationYear: '2021 – 2025', gpa: '7.79 / 10' },
+    { id: 'intermediate-mpc', degree: 'Intermediate (MPC)', institution: 'SASI Junior College', location: 'Velivennu', graduationYear: '2019 – 2021', gpa: '91.9%' },
+    { id: 'ssc', degree: 'SSC', institution: 'Lotus High School', location: 'Tadepalligudem', graduationYear: '2019', gpa: '74.6%' }
+  ],
+  projects: [
+    { id: 'ai-career-assistant', title: 'AI Career Assistant — AI-Powered Job Application Platform', description: 'Developing a modular career assistant with resume generation, job discovery/application support, application tracking, and interview preparation. Designed a flow to tailor ATS-friendly resumes to a selected job description and let users review the resume before use. Includes tracking to identify jobs already applied to, job matching based on user skills, and a separate workflow for a user-provided job link. Uses Python and a Groq API integration for AI-powered capabilities; application features are being built iteratively.', technologies: ['Python', 'Groq API'] },
+    { id: 'facetally', title: 'FaceTally — Face Detection, Recognition & Counting Web App', description: 'Developed a Flask application to detect, recognize, and count faces in uploaded media using OpenCV and face_recognition. Implemented Firebase Authentication with server-side token verification and user-specific known-face storage. Set up a Docker-based environment and persistent storage for reference face data.', technologies: ['Python', 'Flask', 'OpenCV', 'face_recognition', 'Firebase', 'Docker'] },
+    { id: 'code-review-assistant', title: 'AI-Powered Code Review Assistant', description: 'Created a Python pipeline that analyzes code submissions and integrates an AI API to generate structured review suggestions. Implemented response parsing and prompt refinement to improve the consistency and usefulness of generated feedback.', technologies: ['Python', 'AI API'] },
+    { id: 'samurai-reimei', title: 'SAMURAI REIMEI — Gesture-Controlled FPS Game', description: 'Developing a first-person shooter game project with gesture-based controls and keyboard alternatives for accessible gameplay. Project design includes PC and Android support, multiplayer team rooms, and communication features such as voice signaling and pings.', technologies: ['Gesture Controls', 'PC', 'Android'] }
+  ],
   skills: {
-    mode: 'simple',
+    mode: 'categorized',
     simple: [],
-    categorized: []
+    categorized: [
+      { id: 'programming', name: 'Programming', skills: ['Python', 'SQL'] },
+      { id: 'web-apis', name: 'Web & APIs', skills: ['HTML', 'CSS', 'Flask', 'Django', 'FastAPI', 'REST APIs', 'JSON'] },
+      { id: 'data-analytics', name: 'Data & Analytics', skills: ['Pandas', 'NumPy', 'Excel', 'Power BI', 'Data Cleaning', 'Data Validation'] },
+      { id: 'ai', name: 'AI', skills: ['Generative AI fundamentals', 'Prompt Engineering', 'RAG fundamentals', 'AI API integration'] },
+      { id: 'databases-cloud', name: 'Databases & Cloud', skills: ['SQL databases', 'Cloud Firestore', 'Firebase Authentication', 'AWS S3 fundamentals'] },
+      { id: 'tools', name: 'Tools', skills: ['Git', 'GitHub', 'VS Code', 'Docker', 'Postman'] }
+    ]
   },
-  customSections: [],
-  sections: DEFAULT_SECTIONS,
-  colors: DEFAULT_COLORS,
+  customSections: [
+    { id: 'certifications', title: 'Certifications', content: 'Python for Data Science — IBM Skills Network (Foundation Level)', type: 'bullets', visible: true, order: 7 },
+    { id: 'strengths', title: 'Strengths', content: 'Analytical thinking • Problem-solving • Quick learner • Adaptability • Attention to detail • Team collaboration', type: 'paragraph', visible: true, order: 8 }
+  ],
+  sections: [
+    { id: 'summary', title: 'Professional Summary', visible: true, order: 1 },
+    { id: 'experience', title: 'Internship Experience', visible: true, order: 2 },
+    { id: 'projects', title: 'Projects', visible: true, order: 3 },
+    { id: 'education', title: 'Education', visible: true, order: 4 },
+    { id: 'skills', title: 'Technical Skills', visible: true, order: 5 },
+    { id: 'custom', title: 'Additional Sections', visible: true, order: 6 }
+  ],
+  colors: { ...DEFAULT_COLORS, primary: '#244678', secondary: '#4b5563', text: '#222222', background: '#ffffff' },
   template: 'original-upload',
   pageFormat: 'letter',
   fontSize: 'medium',
-  fontFamily: 'Inter'
+  fontFamily: 'Helvetica',
+  originalTemplate: {
+    sourceFileName: 'Badham_Dileep_Kumar_Updated_Resume.pdf',
+    sourceFormat: 'pdf',
+    importedAt: '2026-09-25T00:00:00.000Z',
+    tailored: false,
+    editableTemplate: 'business-professional'
+  }
 };
 
 const initialState: ResumeState = {

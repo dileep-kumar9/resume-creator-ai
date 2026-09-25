@@ -11,7 +11,14 @@ interface Props { data: ResumeData }
  * single-column content, bold entry titles, and compact bullet lists.
  */
 export const OriginalUploadedTemplate: React.FC<Props> = ({ data }) => {
-  const { personalInfo, summary, experience, education, projects, skills, sections } = data;
+  const { personalInfo, summary, experience, education, projects, skills, sections, customSections } = data;
+  // The source PDF uses Helvetica at approximately 9.2 pt for body text.
+  // CSS px are 0.75 pt in print, so 12.27px reproduces that size.
+  const bodyFontSize = data.fontSize === 'small' ? 11.2 : data.fontSize === 'large' ? 13.6 : 12.27;
+  const sectionFontSize = bodyFontSize * (11 / 9.2);
+  const contactFontSize = bodyFontSize * (9.5 / 9.2);
+  const titleFontSize = bodyFontSize * (10.5 / 9.2);
+  const headingColor = data.colors.primary || '#244678';
 
   const visible = new Set(
     sections.filter(section => section.visible).map(section => section.id)
@@ -36,7 +43,7 @@ export const OriginalUploadedTemplate: React.FC<Props> = ({ data }) => {
 
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <section className="mb-[13px]">
-      <h2 className="mb-[7px] border-b border-black pb-[4px] text-[12px] font-bold uppercase leading-none">
+      <h2 className="mb-[7px] border-b pb-[4px] text-[12px] font-bold uppercase leading-none" style={{ color: headingColor, borderColor: headingColor, fontSize: `${sectionFontSize}px` }}>
         {title}
       </h2>
       {children}
@@ -49,18 +56,18 @@ export const OriginalUploadedTemplate: React.FC<Props> = ({ data }) => {
       data-template="badham-original"
       style={{
         minHeight: '100%',
-        fontFamily: 'Arial, Helvetica, sans-serif',
-        fontSize: '11px',
+        fontFamily: `${data.fontFamily || 'Helvetica'}, Arial, Helvetica, sans-serif`,
+        fontSize: `${bodyFontSize}px`,
         lineHeight: 1.34,
         boxSizing: 'border-box',
       }}
     >
       <header className="text-center pb-[10px]">
-        <h1 className="m-0 text-[18px] font-bold leading-[1.05]">
+        <h1 className="m-0 font-bold leading-[1.05]" style={{ fontSize: '24px' }}>
           {personalInfo.fullName || 'Your Name'}
         </h1>
 
-        <div className="mt-[5px] text-[10px] leading-[1.25]">
+        <div className="mt-[5px] leading-[1.25]" style={{ fontSize: `${contactFontSize}px` }}>
           {personalInfo.email && <ContactLink label="Email" value={personalInfo.email} kind="email" />}
           {personalInfo.phone && <><span> | </span><ContactLink label="Phone" value={personalInfo.phone} kind="phone" /></>}
           {personalInfo.location && <><span> | </span><span>{personalInfo.location}</span></>}
@@ -69,7 +76,7 @@ export const OriginalUploadedTemplate: React.FC<Props> = ({ data }) => {
         </div>
 
         {personalInfo.jobTitle && (
-          <div className="mt-[9px] text-[13px] font-bold leading-[1.15]">
+          <div className="mt-[9px] font-bold leading-[1.15]" style={{ fontSize: `${titleFontSize}px` }}>
             {personalInfo.jobTitle}
           </div>
         )}
@@ -144,21 +151,29 @@ export const OriginalUploadedTemplate: React.FC<Props> = ({ data }) => {
 
         {visible.has('education') && education.length > 0 && (
           <Section title="Education">
-            <div className="space-y-[4px]">
+            <div className="space-y-[6px]">
               {education.map(item => (
-                <div key={item.id} className="flex items-start gap-[5px]">
-                  <span>•</span>
-                  <div>
-                    <strong>{item.degree}</strong>
-                    {item.institution && <> <span>|</span> {item.institution}</>}
-                    {item.gpa && <> <span>|</span> CGPA: {item.gpa}</>}
-                    {item.graduationYear && <> <span>({item.graduationYear})</span></>}
+                <div key={item.id}>
+                  <div className="flex items-start justify-between gap-4">
+                    <strong className="font-bold">{item.degree}</strong>
+                    {item.graduationYear && <span className="shrink-0 text-right">{item.graduationYear}</span>}
+                  </div>
+                  <div className="text-[#444]">
+                    {item.institution}{item.location ? `, ${item.location}` : ''}{item.gpa ? ` — ${item.id === 'btech-it' ? 'CGPA: ' : ''}${item.gpa}` : ''}
                   </div>
                 </div>
               ))}
             </div>
           </Section>
         )}
+
+        {visible.has('custom') && customSections.filter(section => section.visible).sort((a, b) => a.order - b.order).map(section => (
+          <Section key={section.id} title={section.title}>
+            {section.type === 'bullets' ? (
+              <ul className="m-0 list-disc pl-4"><li>{section.content}</li></ul>
+            ) : <p className="m-0">{section.content}</p>}
+          </Section>
+        ))}
       </main>
     </div>
   );

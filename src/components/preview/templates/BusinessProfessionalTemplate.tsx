@@ -174,10 +174,10 @@ export const BusinessProfessionalTemplate: React.FC<TemplateProps> = ({ data }) 
                         <div>
                           <h4 className="text-xs font-bold">{edu.degree}</h4>
                           <div 
-                            className="text-xs font-semibold"
+                            className="text-xs font-normal"
                             style={{ color: colors.secondary }}
                           >
-                            {edu.institution} {edu.location && `• ${edu.location}`}
+                            {edu.institution}{edu.location ? `, ${edu.location}` : ''}{edu.gpa ? ` — ${edu.gpa.toLowerCase().includes('cgpa') || edu.gpa.toLowerCase().includes('gpa') ? edu.gpa : (edu.id === 'btech-it' ? `CGPA: ${edu.gpa}` : edu.gpa)}` : ''}
                           </div>
                           {edu.honors && (
                             <div className="text-xs italic mt-1">{edu.honors}</div>
@@ -190,9 +190,7 @@ export const BusinessProfessionalTemplate: React.FC<TemplateProps> = ({ data }) 
                           >
                             {edu.graduationYear}
                           </div>
-                          {edu.gpa && (
-                            <div className="text-xs">GPA: {edu.gpa}</div>
-                          )}
+
                         </div>
                       </div>
                     </div>
