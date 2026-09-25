@@ -181,6 +181,18 @@ const AgentWorkspace:React.FC=()=>{
         const skillCount=data.skills.mode==='simple'?data.skills.simple.length:data.skills.categorized.reduce((n,c)=>n+c.skills.length,0);
         return (data.experience?.length||0)+(data.projects?.length||0)+(data.education?.length||0)+skillCount;
       };
+      const isSyntheticE2EResume=(data:ResumeData)=>{
+        const name=String(data.personalInfo?.fullName||'').toLowerCase();
+        const email=String(data.personalInfo?.email||'').toLowerCase();
+        const source=String(data.originalTemplate?.sourceFileName||'').toLowerCase();
+        const company=(data.experience||[]).map(x=>String(x.company||'').toLowerCase()).join(' ');
+        return email==='e2e@example.com' || name.includes('e2e test') || source.includes('e2e-test-resume') || company.includes('example technologies');
+      };
+      // Synthetic fixtures are test-only. If one leaked into persisted state from
+      // an older E2E run, never use it for a real chat request.
+      if(isSyntheticE2EResume(workingResume) && !currentAttachment){
+        throw new Error('The current resume is an E2E test fixture, not your uploaded resume. Upload your real PDF/DOCX resume before tailoring.');
+      }
       const looksLikeResumeAttachment=(file:File)=>{
         const name=file.name.toLowerCase();
         return /resume|cv|curriculum/.test(name) || /\b(professional summary|core skills|internship experience|professional experience|key projects|education)\b/i.test(attachmentText);
@@ -385,19 +397,25 @@ const AgentWorkspace:React.FC=()=>{
       check('Tailoring keeps original template',tailoredSnapshot.selectedTemplate==='original-upload',`template=${tailoredSnapshot.selectedTemplate}`);
       check('Tailoring preserves all imported entries',tailoredSnapshot.resumeCounts.experience>=(beforeTailor.experience?.length||0) && tailoredSnapshot.resumeCounts.projects>=(beforeTailor.projects?.length||0) && tailoredSnapshot.resumeCounts.education>=(beforeTailor.education?.length||0),JSON.stringify(tailoredSnapshot.resumeCounts));
       check('Tailoring changed editable content',JSON.stringify(tailoredData?.summary||'')!==JSON.stringify(beforeTailor?.summary||'') || JSON.stringify(tailoredData?.experience||[])!==JSON.stringify(beforeTailor?.experience||[]) || JSON.stringify(tailoredData?.projects||[])!==JSON.stringify(beforeTailor?.projects||[]) || JSON.stringify(tailoredData?.skills||{})!==JSON.stringify(beforeTailor?.skills||{}));
-      // DOCX is tested as an isolated import. Restore the user's real resume
-      // immediately afterward so Run full E2E never leaves the workspace showing
-      // the synthetic e2e@example.com candidate.
-      await importFixtureResume('docx'); check('DOCX resume fixture fetched',true);
-      await new Promise(r=>setTimeout(r,100)); await send(); await new Promise(r=>setTimeout(r,250));
-      const docxSnapshot=(window as any).__RESUME_STUDIO_CONTROL__?.snapshot?.() || getSnapshot();
-      check('DOCX import completed',!!docxSnapshot.originalTemplate && docxSnapshot.originalTemplate.sourceFormat==='docx');
-      if(hadRealResume){
+      // DOCX is tested as an isolated parser operation. Never send the synthetic
+      // DOCX through the live composer here: doing so can replace the user's
+      // active resume and is exactly how the old E2E flow leaked E2E-Test-Resume
+      // into the real workspace.
+      const docxPath='/test-fixtures/e2e-resume.docx';
+      const docxResponse=await fetch(docxPath,{cache:'no-store'});
+      if(!docxResponse.ok) throw new Error(`DOCX resume fixture unavailable (${docxResponse.status}).`);
+      const docxBlob=await docxResponse.blob();
+      const docxFile=new File([docxBlob],'E2E-Test-Resume.docx',{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+      const parsedDocx=await importResumeFromFile(docxFile,true);
+      check('DOCX resume fixture fetched',true);
+      check('DOCX import completed',((parsedDocx.experience?.length||0)>0 && (parsedDocx.projects?.length||0)>0 && (parsedDocx.education?.length||0)>0 && ((parsedDocx.skills.mode==='simple'?parsedDocx.skills.simple.length:parsedDocx.skills.categorized.reduce((n,c)=>n+c.skills.length,0))>0)));
+      if(!hadRealResume){
+        // A fixture-only E2E run must leave an initially empty workspace empty.
         importResumeData(e2eResumeBefore);
         resumeDataRef.current=e2eResumeBefore;
-        setResumeOpen(true);
+        setResumeOpen(false);
         setResumeEditMode(false);
-        await new Promise(r=>setTimeout(r,150));
+        await new Promise(r=>setTimeout(r,100));
       }
       await copyMessage({id:'qa-copy',role:'assistant',text:'Resume Studio E2E copy test'}); check('Chat copy action available',true);
       check('No runtime errors recorded',runtimeErrors.length===0,runtimeErrors.join(' | '));
@@ -509,7 +527,11 @@ const AgentWorkspace:React.FC=()=>{
   const autoE2ERanRef=useRef(false);
   useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
-    if(params.get('e2e')==='1' && !autoE2ERanRef.current){
+    // ?e2e=1 exposes the Control Center but MUST NOT automatically inject the
+    // synthetic E2E candidate into a user's workspace. Automatic execution is
+    // opt-in with ?e2e=1&autorun=1 so a real uploaded resume always remains the
+    // source used by normal chat tailoring.
+    if(params.get('e2e')==='1' && params.get('autorun')==='1' && !autoE2ERanRef.current){
       autoE2ERanRef.current=true;
       const timer=window.setTimeout(()=>runFullE2E(),350);
       return()=>window.clearTimeout(timer);

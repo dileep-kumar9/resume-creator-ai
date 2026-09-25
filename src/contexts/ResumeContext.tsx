@@ -188,6 +188,19 @@ const loadPersistedState = (): ResumeState => {
     if (!raw) return initialState;
     const parsed = JSON.parse(raw) as ResumeData;
     if (!parsed || typeof parsed !== 'object' || !parsed.personalInfo || !Array.isArray(parsed.sections)) return initialState;
+    // Never restore the synthetic E2E candidate into the user's real workspace.
+    // Older E2E runs could persist E2E-Test-Resume in localStorage; clear that
+    // stale fixture automatically so normal chat tailoring starts from the
+    // user's actual upload.
+    const name=String(parsed.personalInfo?.fullName||'').toLowerCase();
+    const email=String(parsed.personalInfo?.email||'').toLowerCase();
+    const source=String(parsed.originalTemplate?.sourceFileName||'').toLowerCase();
+    const company=(parsed.experience||[]).map((x:any)=>String(x.company||'').toLowerCase()).join(' ');
+    const synthetic=email==='e2e@example.com' || name.includes('e2e test') || source.includes('e2e-test-resume') || company.includes('example technologies');
+    if(synthetic){
+      window.localStorage.removeItem('resume-studio-resume-data');
+      return initialState;
+    }
     return { ...initialState, resumeData: parsed };
   } catch {
     return initialState;
