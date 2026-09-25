@@ -74,7 +74,10 @@ export const ResumePreview: React.FC<{ artifact?: boolean }> = ({ artifact = fal
   // In the Created Resume artifact the ONLY sizing constraint is the panel
   // width. The page is allowed to become taller than the viewport and the
   // artifact scrolls vertically, exactly like a document/artifact viewer.
-  const scale = artifact ? Math.min(1, scaleWidth) : Math.min(1, scaleWidth, 650 / pageHeight);
+  // Keep the artifact document readable at narrow widths. Below ~62% a full A4/Letter
+  // page becomes effectively unreadable; the artifact itself can still be resized
+  // to any width, while the document viewer scrolls horizontally when necessary.
+  const scale = artifact ? Math.min(1, Math.max(0.62, scaleWidth)) : Math.min(1, scaleWidth, 650 / pageHeight);
 
   return (
     <div ref={previewHostRef} className="w-full h-full flex items-center justify-center p-2">

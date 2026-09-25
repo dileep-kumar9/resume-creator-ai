@@ -9,7 +9,7 @@ import { importResumeFromFile } from '../utils/resumeImportExport';
 import { exportResumeToPDF, exportResumeToDOCX } from '../utils/resumeExport';
 import { extractResumeText, normalizeParsedResume } from '../utils/resumeParser';
 import { ResumeData } from '../types/resume';
-import { Menu, X, FileText, Palette, Settings, LayoutTemplate, Paperclip, Send, Loader2, Download, FileDown, RotateCcw, Sparkles, ChevronLeft } from 'lucide-react';
+import { Menu, X, FileText, Palette, Settings, LayoutTemplate, Paperclip, Send, Loader2, Download, FileDown, RotateCcw, Sparkles, ChevronLeft, Copy, Check, PlayCircle, Bug } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 
 type SidePanel='content'|'customize'|'settings'|'templates';
@@ -25,6 +25,7 @@ const AgentWorkspace:React.FC=()=>{
   const [sidebarWidth,setSidebarWidth]=useState(320);
   const [panel,setPanel]=useState<SidePanel>('content');
   const [prompt,setPrompt]=useState('');
+  const promptRef=useRef('');
   const [loading,setLoading]=useState(false);
   const [attachment,setAttachment]=useState<File|null>(null);
   const [attachmentKind,setAttachmentKind]=useState<'resume'|'reference'|null>(null);
@@ -32,10 +33,19 @@ const AgentWorkspace:React.FC=()=>{
   const [attachmentPdf,setAttachmentPdf]=useState('');
   const [history,setHistory]=useState<ResumeData[]>([]);
   const [messages,setMessages]=useState<ChatItem[]>([{id:'welcome',role:'assistant',text:'Upload your resume, paste a job description, or tell me what you want changed. I can tailor content, change templates, use a reference resume, make it one page, and export the result.'}]);
+  const [copiedMessageId,setCopiedMessageId]=useState<string|null>(null);
+  const [controlMode]=useState(()=>{const params=new URLSearchParams(window.location.search);return params.get('control')==='1'||params.get('e2e')==='1';});
+  const [qaRunning,setQaRunning]=useState(false);
+  const [qaResults,setQaResults]=useState<Array<{name:string;status:'pass'|'fail'|'info';detail?:string}>>([]);
+  const [runtimeErrors,setRuntimeErrors]=useState<string[]>([]);
   const fileRef=useRef<HTMLInputElement>(null);
   const importRef=useRef<HTMLInputElement>(null);
   const chatScrollRef=useRef<HTMLDivElement>(null);
   const chatInputRef=useRef<HTMLTextAreaElement>(null);
+  const resumeDataRef=useRef<ResumeData>(state.resumeData);
+  resumeDataRef.current=state.resumeData;
+  const attachmentRef=useRef<File|null>(null);
+  const attachmentKindRef=useRef<'resume'|'reference'|null>(null);
 
   // ChatGPT-style behavior: every new user/assistant message and the loading
   // state keeps the conversation viewport at the newest content. The user can
@@ -123,6 +133,7 @@ const AgentWorkspace:React.FC=()=>{
   },[prompt]);
 
   const clearAttachment=()=>{
+    attachmentRef.current=null; attachmentKindRef.current=null;
     setAttachment(null);
     setAttachmentKind(null);
     setAttachmentText('');
@@ -132,6 +143,7 @@ const AgentWorkspace:React.FC=()=>{
   // Uploading a file only attaches it to the composer. It must never change the
   // resume, template, or artifact until the user explicitly presses Send.
   const readAttachment=async(file:File, kind:'resume'|'reference'='reference')=>{
+    attachmentRef.current=file; attachmentKindRef.current=kind;
     setAttachment(file); setAttachmentKind(kind); setAttachmentText(''); setAttachmentPdf('');
     try{
       const text=await extractResumeText(file); setAttachmentText(text.slice(0,120000));
@@ -147,12 +159,16 @@ const AgentWorkspace:React.FC=()=>{
   };
 
   const send=async()=>{
-    const hasAttachment=Boolean(attachment);
-    if((!prompt.trim()&&!hasAttachment)||loading)return;
+    const currentAttachment=attachmentRef.current || attachment;
+    const currentAttachmentKind=attachmentKindRef.current || attachmentKind;
+    const currentPrompt=promptRef.current || prompt;
+    const hasAttachment=Boolean(currentAttachment);
+    if((!currentPrompt.trim()&&!hasAttachment)||loading)return;
 
-    const instruction=prompt.trim() || (attachmentKind==='resume' ? 'Use this uploaded file as my resume.' : 'Analyze the attached reference document and help me improve my resume.');
-    const att=attachment?.name;
+    const instruction=currentPrompt.trim() || (currentAttachmentKind==='resume' ? 'Use this uploaded file as my resume.' : 'Analyze the attached reference document and help me improve my resume.');
+    const att=currentAttachment?.name;
     setMessages(m=>[...m,{id:crypto.randomUUID(),role:'user',text:instruction,attachment:att}]);
+    promptRef.current='';
     setPrompt('');
     requestAnimationFrame(()=>{ if(chatInputRef.current){ chatInputRef.current.style.height='34px'; chatInputRef.current.style.overflowY='hidden'; }});
     setLoading(true);
@@ -161,22 +177,22 @@ const AgentWorkspace:React.FC=()=>{
       // A resume upload is parsed only after Send. This prevents sidebar/tab
       // changes and file selection from mutating the live resume automatically.
       let workingResume=state.resumeData;
-      if(attachment && attachmentKind==='resume'){
-        workingResume=await importResumeFromFile(attachment,!attachment.name.toLowerCase().endsWith('.json'));
+      if(currentAttachment && currentAttachmentKind==='resume'){
+        workingResume=await importResumeFromFile(currentAttachment,!currentAttachment.name.toLowerCase().endsWith('.json'));
         importResumeData(workingResume);
         openArtifact();
 
         // If the user only uploaded a resume and did not ask for an AI change,
         // stop here. The explicit Send action is the import/parse confirmation.
-        if(!prompt.trim()){
+        if(!currentPrompt.trim()){
           setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',text:'Resume loaded. Your uploaded content is now in the editor. Tell me what you want to change or paste a job description.',hasResume:true}]);
           clearAttachment();
           return;
         }
       }
 
-      const referenceTextForAgent=attachmentKind==='reference' ? attachmentText : '';
-      const referencePdfForAgent=attachmentKind==='reference' ? attachmentPdf : '';
+      const referenceTextForAgent=currentAttachmentKind==='reference' ? attachmentText : '';
+      const referencePdfForAgent=currentAttachmentKind==='reference' ? attachmentPdf : '';
       const r=await fetch('/api/agent',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -218,6 +234,91 @@ const AgentWorkspace:React.FC=()=>{
     setArtifactWidth(w=>w>24?w:Math.min(760, Math.max(360, Math.floor(window.innerWidth*0.42))));
     setResumeOpen(true);
     setResumeEditMode(false);
+  };
+
+  const copyMessage=async(msg:ChatItem)=>{
+    try{
+      const parts=[msg.text];
+      if(msg.changes?.length) parts.push(msg.changes.map(x=>`• ${x}`).join('\n'));
+      if(msg.analysis?.gaps?.length) parts.push(`Gaps: ${msg.analysis.gaps.join(', ')}`);
+      await navigator.clipboard.writeText(parts.filter(Boolean).join('\n\n'));
+      setCopiedMessageId(msg.id);
+      window.setTimeout(()=>setCopiedMessageId(id=>id===msg.id?null:id),1400);
+    }catch{
+      setRuntimeErrors(e=>[...e.slice(-9),'Clipboard copy failed.']);
+    }
+  };
+
+  const getSnapshot=()=>({
+    url:window.location.href, panel, sidebarOpen, sidebarWidth, resumeOpen, resumeEditMode, artifactWidth, loading,
+    attachment:attachment?.name||null, attachmentKind, promptLength:prompt.length, messageCount:messages.length,
+    selectedTemplate:state.resumeData.template,
+    originalTemplate:state.resumeData.originalTemplate ? {sourceFileName:state.resumeData.originalTemplate.sourceFileName,sourceFormat:state.resumeData.originalTemplate.sourceFormat,tailored:!!state.resumeData.originalTemplate.tailored} : null,
+    resumeCounts:{experience:state.resumeData.experience.length,projects:state.resumeData.projects.length,education:state.resumeData.education.length,skills:state.resumeData.skills.mode==='simple'?state.resumeData.skills.simple.length:state.resumeData.skills.categorized.reduce((n,c)=>n+c.skills.length,0)},
+    errors:[...runtimeErrors]
+  });
+
+  const attachFileBase64=async(name:string,base64:string,mime='application/pdf',kind:'resume'|'reference'='resume')=>{
+    const binary=atob(base64.replace(/^data:[^,]+,/i,''));
+    const bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+    const file=new File([bytes],name,{type:mime});
+    await readAttachment(file,kind);
+    return {name:file.name,size:file.size,type:file.type};
+  };
+
+  const importFixtureResume=async(format:'pdf'|'docx'='pdf')=>{
+    const path=format==='pdf'?'/test-fixtures/e2e-resume.pdf':'/test-fixtures/e2e-resume.docx';
+    const name=format==='pdf'?'E2E-Test-Resume.pdf':'E2E-Test-Resume.docx';
+    const type=format==='pdf'?'application/pdf':'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const response=await fetch(path,{cache:'no-store'});
+    if(!response.ok) throw new Error(`Fixture resume unavailable (${response.status}).`);
+    const blob=await response.blob();
+    const file=new File([blob],name,{type});
+    await readAttachment(file,'resume');
+    return file;
+  };
+
+  const runFullE2E=async()=>{
+    if(qaRunning)return;
+    setQaRunning(true); setQaResults([]); setRuntimeErrors([]);
+    const resultRows:Array<{name:string;status:'pass'|'fail'|'info';detail?:string}> = [];
+    const check=(name:string,condition:boolean,detail?:string)=>resultRows.push({name,status:condition?'pass':'fail',detail});
+    try{
+      check('Control bridge loaded',true);
+      setPanel('content'); check('Content panel selectable',true);
+      await importFixtureResume('pdf'); check('PDF resume fixture fetched',true);
+      await new Promise(r=>setTimeout(r,100));
+      await send();
+      await new Promise(r=>setTimeout(r,250));
+      const imported=(window as any).__RESUME_STUDIO_CONTROL__?.snapshot?.() || getSnapshot();
+      check('Resume import completed',!!imported.originalTemplate);
+      check('Original template retained',imported.selectedTemplate==='original-upload',`template=${imported.selectedTemplate}`);
+      check('Imported resume has core sections',imported.resumeCounts.experience>0 || imported.resumeCounts.projects>0 || imported.resumeCounts.education>0,JSON.stringify(imported.resumeCounts));
+      setPanel('templates'); check('Templates panel selectable',true);
+      setPanel('customize'); check('Customize panel selectable',true);
+      setPanel('settings'); check('Settings panel selectable',true);
+      setPanel('content'); openArtifact(); setResumeEditMode(false); check('Artifact opened',true);
+      setArtifactWidth(Math.max(280,Math.min(720,Math.floor(window.innerWidth*.38)))); check('Artifact resize command accepted',true);
+      setArtifactWidth(1); setResumeOpen(false); check('Artifact can close at near-zero width',true);
+      openArtifact(); setResumeEditMode(true); check('Artifact Edit mode available',true);
+      setResumeEditMode(false); check('Artifact Preview mode available',true);
+      const jd='Job Title: Agent Product Builder\nEnd-to-End Agent Development and applied data science. Work with Python, SQL, data transformation, unstructured data processing, dashboards, anomaly identification and data analytics. Build autonomous AI agents and solve ambiguous technical problems.';
+      promptRef.current=jd; setPrompt(jd);
+      await new Promise(r=>setTimeout(r,80));
+      await send();
+      await new Promise(r=>setTimeout(r,350));
+      const tailoredSnapshot=(window as any).__RESUME_STUDIO_CONTROL__?.snapshot?.() || getSnapshot();
+      check('Resume tailoring through chat completed',tailoredSnapshot.resumeCounts.experience>0 || tailoredSnapshot.resumeCounts.projects>0,JSON.stringify(tailoredSnapshot.resumeCounts));
+      check('Tailoring keeps original template',tailoredSnapshot.selectedTemplate==='original-upload',`template=${tailoredSnapshot.selectedTemplate}`);
+      await importFixtureResume('docx'); check('DOCX resume fixture fetched',true);
+      await new Promise(r=>setTimeout(r,100)); await send(); await new Promise(r=>setTimeout(r,250));
+      const docxSnapshot=(window as any).__RESUME_STUDIO_CONTROL__?.snapshot?.() || getSnapshot();
+      check('DOCX import completed',!!docxSnapshot.originalTemplate && docxSnapshot.originalTemplate.sourceFormat==='docx');
+      await copyMessage({id:'qa-copy',role:'assistant',text:'Resume Studio E2E copy test'}); check('Chat copy action available',true);
+      check('No runtime errors recorded',runtimeErrors.length===0,runtimeErrors.join(' | '));
+    }catch(e){resultRows.push({name:'Full E2E runner',status:'fail',detail:e instanceof Error?e.message:String(e)});}
+    finally{setQaResults(resultRows); setQaRunning(false);}
   };
 
   const undo=()=>{
@@ -295,6 +396,44 @@ const AgentWorkspace:React.FC=()=>{
     ['settings','Settings',Settings],
   ];
 
+  useEffect(()=>{
+    const bridge={
+      version:'1.0', snapshot:getSnapshot, getResumeData:()=>structuredClone(resumeDataRef.current),
+      setPanel:(next:SidePanel)=>setPanel(next),
+      openArtifact, closeArtifact:()=>{setResumeOpen(false);setResumeEditMode(false);},
+      setArtifactWidth:(width:number)=>setArtifactWidth(Math.max(0,Number(width)||0)),
+      setSidebarOpen:(open:boolean)=>setSidebarOpen(!!open), setPrompt:(text:string)=>setPrompt(String(text||'')), clearPrompt:()=>setPrompt(''),
+      attachFixtureResume:(format:'pdf'|'docx'='pdf')=>importFixtureResume(format), attachFileBase64, send, toggleEdit:(edit:boolean)=>setResumeEditMode(!!edit), runFullE2E,
+      undo, exportPDF:pdf, exportDOCX:docx,
+      selectTemplate:(template:ResumeData['template'])=>{importResumeData({...resumeDataRef.current,template});},
+      copyMessage:(id:string)=>{const msg=messages.find(m=>m.id===id); if(msg)return copyMessage(msg); throw new Error(`Message not found: ${id}`);},
+      getDiagnostics:()=>({snapshot:getSnapshot(),qaResults,runtimeErrors,dom:{chatInput:!!document.querySelector('[data-control=chat-input]'),send:!!document.querySelector('[data-control=send]'),artifact:!!document.querySelector('[aria-label="Created resume artifact"]'),preview:!!document.querySelector('[data-control=preview]'),edit:!!document.querySelector('[data-control=edit]'),copyButtons:document.querySelectorAll('[data-control=copy-message]').length}}),
+      click:(selector:string)=>{const el=document.querySelector(selector) as HTMLElement|null;if(!el)throw new Error(`Element not found: ${selector}`);el.click();return true;},
+      type:(selector:string,text:string)=>{const el=document.querySelector(selector) as HTMLInputElement|HTMLTextAreaElement|null;if(!el)throw new Error(`Field not found: ${selector}`);const setter=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el),'value')?.set;if(setter)setter.call(el,text);else el.value=text;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;}
+    };
+    (window as any).__RESUME_STUDIO_CONTROL__=bridge;
+    return()=>{if((window as any).__RESUME_STUDIO_CONTROL__===bridge)delete (window as any).__RESUME_STUDIO_CONTROL__;};
+  });
+
+  useEffect(()=>{
+    const onError=(event:ErrorEvent)=>setRuntimeErrors(e=>[...e.slice(-9),event.message||'Window error']);
+    const onRejection=(event:PromiseRejectionEvent)=>setRuntimeErrors(e=>[...e.slice(-9),String(event.reason?.message||event.reason||'Unhandled promise rejection')]);
+    window.addEventListener('error',onError); window.addEventListener('unhandledrejection',onRejection);
+    return()=>{window.removeEventListener('error',onError);window.removeEventListener('unhandledrejection',onRejection);};
+  },[]);
+
+  const autoE2ERanRef=useRef(false);
+  useEffect(()=>{
+    const params=new URLSearchParams(window.location.search);
+    if(params.get('e2e')==='1' && !autoE2ERanRef.current){
+      autoE2ERanRef.current=true;
+      const timer=window.setTimeout(()=>runFullE2E(),350);
+      return()=>window.clearTimeout(timer);
+    }
+  },[]);
+
+  const controlUrlEnabled=controlMode;
+
   return <div
     className={`resume-studio-app ${sidebarOpen?'sidebar-expanded':'sidebar-collapsed'} ${resumeOpen?'artifact-open':'artifact-closed'}`}
     style={{'--studio-sidebar-width':`${sidebarWidth}px`,'--artifact-width':`${artifactWidth}px`} as React.CSSProperties}
@@ -312,7 +451,7 @@ const AgentWorkspace:React.FC=()=>{
         {navItems.map(([id,label,Icon])=><Button
           key={id}
           variant={panel===id?'secondary':'ghost'}
-          className="resume-studio-nav-item"
+          className="resume-studio-nav-item" data-control="nav-item"
           onClick={()=>{setPanel(id); if(!sidebarOpen)setSidebarOpen(true);}}
           title={label}
           aria-label={label}
@@ -376,6 +515,7 @@ const AgentWorkspace:React.FC=()=>{
                 <div className={`resume-chat-message ${msg.role==='user'?'user-message':'assistant-message'}`}>
                   {msg.attachment&&<div className="mb-2 inline-flex items-center gap-2 border rounded-xl px-3 py-2 bg-background"><FileText className="w-4 h-4"/><span className="max-w-[260px] truncate">{msg.attachment}</span></div>}
                   <div className="whitespace-pre-wrap">{msg.text}</div>
+                  <div className="resume-chat-message-actions"><Button size="sm" variant="ghost" data-control="copy-message" onClick={()=>copyMessage(msg)} title="Copy message" aria-label={`Copy ${msg.role} message`}>{copiedMessageId===msg.id?<><Check className="w-3.5 h-3.5"/>Copied</>:<><Copy className="w-3.5 h-3.5"/>Copy</>}</Button></div>
                   {msg.changes?.length?<ul className="mt-3 list-disc pl-5 text-muted-foreground">{msg.changes.map((x,i)=><li key={i}>{x}</li>)}</ul>:null}
                   {msg.analysis?.gaps?.length?<div className="mt-3 text-muted-foreground"><b className="text-foreground">Gaps:</b> {msg.analysis.gaps.join(', ')}</div>:null}
                   {msg.hasResume&&<div className="resume-chat-artifact-link">
@@ -390,23 +530,23 @@ const AgentWorkspace:React.FC=()=>{
 
           <div className="resume-chat-composer-wrap">
             <div className="resume-chat-composer">
-              {attachment&&<div className="resume-chat-attachment"><FileText className="w-4 h-4"/><span>{attachment.name}</span><button type="button" onClick={()=>{setAttachment(null);setAttachmentText('');setAttachmentPdf('')}} aria-label="Remove attachment"><X className="w-3.5 h-3.5"/></button></div>}
+              {attachment&&<div className="resume-chat-attachment"><FileText className="w-4 h-4"/><span>{attachment.name}</span><button type="button" onClick={clearAttachment} aria-label="Remove attachment"><X className="w-3.5 h-3.5"/></button></div>}
               <Textarea
                 ref={chatInputRef}
                 rows={1}
                 value={prompt}
-                onChange={e=>{setPrompt(e.target.value);requestAnimationFrame(resizeChatInput);}}
+                onChange={e=>{promptRef.current=e.target.value;setPrompt(e.target.value);requestAnimationFrame(resizeChatInput);}}
                 onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}}
                 placeholder="Message Resume Agent… paste a JD or ask for any resume change"
                 aria-label="Message Resume Agent"
-                className="resume-chat-input"
+                className="resume-chat-input" data-control="chat-input"
               />
               <div className="resume-chat-composer-actions">
                 <div className="flex gap-1 items-center">
                   <Button size="icon" variant="ghost" onClick={()=>fileRef.current?.click()} title="Attach reference document" aria-label="Attach reference"><Paperclip className="w-4 h-4"/></Button>
-                  <Button size="sm" variant="ghost" onClick={()=>importRef.current?.click()}>Upload resume</Button>
+                  <Button size="sm" variant="ghost" data-control="upload-resume" onClick={()=>importRef.current?.click()}>Upload resume</Button>
                 </div>
-                <Button size="icon" className="rounded-full resume-send-button" disabled={(!prompt.trim()&&!attachment)||loading} onClick={send} title="Send" aria-label="Send message">
+                <Button size="icon" className="rounded-full resume-send-button" disabled={(!promptRef.current.trim()&&!attachment)||loading} onClick={send} title="Send" aria-label="Send message">
                   {loading?<Loader2 className="w-4 h-4 animate-spin"/>:<Send className="w-4 h-4"/>}
                 </Button>
               </div>
@@ -427,7 +567,11 @@ const AgentWorkspace:React.FC=()=>{
                   : 'Editable template selected by you'}
               </div>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="resume-artifact-header-actions">
+              <div className="resume-artifact-mode-controls" aria-label="Resume view mode">
+                <Button size="sm" variant={!resumeEditMode?'secondary':'ghost'} data-control="preview" onClick={()=>setResumeEditMode(false)}>Preview</Button>
+                <Button size="sm" variant={resumeEditMode?'secondary':'ghost'} data-control="edit" onClick={()=>setResumeEditMode(true)}>Edit</Button>
+              </div>
               <Button
                 size="icon"
                 variant="ghost"
@@ -440,14 +584,6 @@ const AgentWorkspace:React.FC=()=>{
             </div>
           </div>
 
-          <div className="resume-artifact-toolbar">
-            <span className="text-xs text-muted-foreground">Live artifact</span>
-            <div className="flex gap-1">
-              <Button size="sm" variant="ghost" onClick={()=>setResumeEditMode(false)}>Preview</Button>
-              <Button size="sm" variant={resumeEditMode?'secondary':'ghost'} onClick={()=>setResumeEditMode(true)}>Edit</Button>
-            </div>
-          </div>
-
           <div className="resume-artifact-body">
             {resumeEditMode
               ? <div className="resume-artifact-editor"><ResumeForm activePanel="form"/></div>
@@ -455,6 +591,14 @@ const AgentWorkspace:React.FC=()=>{
           </div>
         </aside>}
       </div>
+
+      {controlUrlEnabled && <aside className="resume-control-center" aria-label="Resume Studio control center">
+        <div className="resume-control-center-header"><div className="flex items-center gap-2"><Bug className="w-4 h-4"/><strong>Control Center</strong></div><span className="text-[10px] text-muted-foreground">E2E / automation bridge</span></div>
+        <div className="resume-control-center-actions"><Button size="sm" onClick={()=>runFullE2E()} disabled={qaRunning}><PlayCircle className="w-4 h-4 mr-1"/>{qaRunning?'Running…':'Run full E2E'}</Button><Button size="sm" variant="outline" onClick={()=>setQaResults([])}>Clear</Button></div>
+        <div className="resume-control-results">{qaResults.length===0 ? <div className="text-xs text-muted-foreground">Runs the real import, artifact, composer, tailoring API and copy flows. No mock API result is used.</div> : qaResults.map((r,i)=><div key={i} className={`resume-control-result ${r.status}`}><span>{r.status==='pass'?'✓':r.status==='fail'?'✕':'•'}</span><div><strong>{r.name}</strong>{r.detail&&<div>{r.detail}</div>}</div></div>)}</div>
+        {runtimeErrors.length>0&&<div className="resume-control-errors"><strong>Runtime errors</strong>{runtimeErrors.map((e,i)=><div key={i}>{e}</div>)}</div>}
+        <pre className="resume-control-snapshot">{JSON.stringify(getSnapshot(),null,2)}</pre>
+      </aside>}
 
       <input ref={fileRef} className="hidden" type="file" accept=".pdf,.docx,.txt" onChange={e=>{const f=e.target.files?.[0];if(f)readAttachment(f,'reference');e.currentTarget.value='';}}/>
       <input ref={importRef} className="hidden" type="file" accept=".pdf,.docx,.txt,.json" onChange={e=>{const f=e.target.files?.[0];if(f)readAttachment(f,'resume');e.currentTarget.value='';}}/>

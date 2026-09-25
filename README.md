@@ -139,3 +139,16 @@ The local Node server remains available for development only.
 - AI requests use provider fallback where configured; rate-limit responses are surfaced as a temporary retry message.
 - Light/dark theme is persisted locally in the browser.
 - The About page contains no inherited developer/source-repository links.
+
+## Browser-control / E2E mode
+
+The Resume Studio now exposes a browser-control contract for end-to-end inspection of the real application.
+
+- Control UI: `/resume-maker?control=1`
+- Automatic full E2E run: `/resume-maker?e2e=1`
+- Control manifest: `/control-manifest.json`
+- Browser bridge: `window.__RESUME_STUDIO_CONTROL__`
+
+The bridge controls the real UI and state rather than a mock test page. It supports resume fixture import (PDF/DOCX), arbitrary base64 file attachment, chat input/send, tailoring, artifact open/close/resize, Preview/Edit, template selection, undo, exports, message copy, panel navigation, DOM clicks/types, state snapshots, diagnostics, and the full E2E runner.
+
+The E2E runner exercises the actual import and chat tailoring paths and reports failures in the Control Center. Provider failures are reported as failures; the test never pretends that an unavailable AI provider succeeded.

@@ -1,0 +1,41 @@
+{
+  "name": "Resume Studio Browser Control Contract",
+  "version": "1.0",
+  "controlUrl": "/resume-maker?control=1",
+  "e2eUrl": "/resume-maker?e2e=1",
+  "bridge": "window.__RESUME_STUDIO_CONTROL__",
+  "commands": {
+    "snapshot": "bridge.snapshot()",
+    "getResumeData": "bridge.getResumeData()",
+    "setPanel": "bridge.setPanel('content'|'templates'|'customize'|'settings')",
+    "openArtifact": "bridge.openArtifact()",
+    "closeArtifact": "bridge.closeArtifact()",
+    "setArtifactWidth": "bridge.setArtifactWidth(number)",
+    "setSidebarOpen": "bridge.setSidebarOpen(boolean)",
+    "setPrompt": "bridge.setPrompt(text)",
+    "attachFixtureResume": "await bridge.attachFixtureResume('pdf'|'docx')",
+    "attachFileBase64": "await bridge.attachFileBase64(name,base64,mime,'resume'|'reference')",
+    "send": "await bridge.send()",
+    "toggleEdit": "bridge.toggleEdit(boolean)",
+    "selectTemplate": "bridge.selectTemplate(templateId)",
+    "copyMessage": "await bridge.copyMessage(messageId)",
+    "runFullE2E": "await bridge.runFullE2E()",
+    "diagnostics": "bridge.getDiagnostics()",
+    "click": "bridge.click(cssSelector)",
+    "type": "bridge.type(cssSelector,text)"
+  },
+  "fixtureFiles": {
+    "pdf": "/test-fixtures/e2e-resume.pdf",
+    "docx": "/test-fixtures/e2e-resume.docx"
+  },
+  "importantSelectors": {
+    "chatInput": "[data-control=chat-input]",
+    "send": "[data-control=send]",
+    "uploadResume": "[data-control=upload-resume]",
+    "copyMessage": "[data-control=copy-message]",
+    "preview": "[data-control=preview]",
+    "edit": "[data-control=edit]",
+    "artifactResize": "[aria-label='Resize created resume']",
+    "sidebarResize": "[aria-label='Resize sidebar']"
+  }
+}
