@@ -188,7 +188,7 @@ npm run typecheck   # frontend and server TypeScript
 
 ### Vercel + Firebase (recommended, free tiers)
 
-The web app is served by Vercel's CDN, every `/api/*` request runs the same Express app as a serverless function (`api/[...path].mjs` → `build/server/src/vercel.js`), data is stored in **Cloud Firestore**, and users sign in with **Firebase Authentication** (email/password and Google). Each user's resumes are stored under their account and appear in **My resumes** on any device.
+The web app is served by Vercel's CDN, every `/api/*` request runs the same Express app as a serverless function (`api/index.mjs` → `build/server/src/vercel.js`, with every `/api/*` path rewritten to it in `vercel.json`), data is stored in **Cloud Firestore**, and users sign in with **Firebase Authentication** (email/password and Google). Each user's resumes are stored under their account and appear in **My resumes** on any device.
 
 **1. Firebase project** — https://console.firebase.google.com
 
