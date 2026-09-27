@@ -62,13 +62,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     trustProxy: env.TRUST_PROXY === 'true' || !!env.VERCEL,
     firebase: {
-      projectId: env.FIREBASE_PROJECT_ID || '',
-      clientEmail: env.FIREBASE_CLIENT_EMAIL || '',
+      // Trimmed and unquoted: values pasted into hosting dashboards often carry stray spaces or newlines.
+      projectId: (env.FIREBASE_PROJECT_ID || '').trim().replace(/^"|"$/g, ''),
+      clientEmail: (env.FIREBASE_CLIENT_EMAIL || '').trim().replace(/^"|"$/g, ''),
       // Env vars usually store the key with literal "\n" sequences.
       // Surrounding quotes pasted into a hosting dashboard are removed too.
       privateKey: (env.FIREBASE_PRIVATE_KEY || '').trim().replace(/^"([\s\S]*)"$/, '$1').replace(/\\n/g, '\n'),
     },
-    requireAuth: env.REQUIRE_AUTH ? env.REQUIRE_AUTH === 'true' : !!env.FIREBASE_PROJECT_ID,
+    requireAuth: env.REQUIRE_AUTH ? env.REQUIRE_AUTH.trim() === 'true' : !!(env.FIREBASE_PROJECT_ID || '').trim(),
     ai: {
       order: (env.AI_PROVIDER_ORDER || 'gemini,groq,mistral,anthropic').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
       anthropicKey: env.ANTHROPIC_API_KEY || '',
