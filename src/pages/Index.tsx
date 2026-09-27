@@ -1,101 +1,73 @@
 import React from 'react';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { FileText, Palette, Download, Zap, Users, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { BarChart3, FileCheck2, History, MessageSquare, ShieldCheck, Sparkles } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { ThemeToggle } from '../components/ThemeToggle';
+import { UserMenu } from '@/components/auth/UserMenu';
+import { sessionStore } from '../lib/sessions';
+
+const FEATURES = [
+  { icon: FileCheck2, title: 'Upload once', text: 'PDF, DOCX or pasted text. Your original resume is stored as the source of truth for the whole session.' },
+  { icon: Sparkles, title: 'Tailored to the job', text: 'Paste a job description and get an ATS-friendly resume built only from your real experience.' },
+  { icon: MessageSquare, title: 'Edit by chatting', text: '“Make my summary shorter”, “Highlight my AWS work”, “Undo” — as many times as you need.' },
+  { icon: BarChart3, title: 'Explained ATS score', text: 'A transparent 0–100 compatibility estimate with matched and missing keywords and evidence.' },
+  { icon: History, title: 'Every version kept', text: 'Preview, compare, restore, undo and redo. Nothing is ever lost.' },
+  { icon: ShieldCheck, title: 'No invented facts', text: 'Unsupported skills, metrics and employers are blocked and reported as skill gaps instead.' },
+];
 
 const Index = () => {
+  const last = sessionStore.last();
   return (
-    <div className="min-h-screen bg-gradient-secondary">
-      {/* Hero Section */}
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center mb-16">
-          <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-primary flex items-center justify-center">
-              <FileText className="w-10 h-10 text-white" />
-            </div>
-          </div>
-          <h1 className="text-5xl font-bold text-gradient mb-6">Resume Maker</h1>
-          <p className="text-xl text-text-secondary mb-8 max-w-2xl mx-auto">
-            Create professional, ATS-friendly resumes with our modern resume builder. 
-            Choose from 6 beautiful templates and customize to perfection.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button asChild size="lg" className="resume-hover">
-              <Link to="/resume-maker">
-                Start Building Your Resume
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg" className="resume-hover">
-              <Link to="/about">
-                Learn More
-              </Link>
-            </Button>
-          </div>
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-background dark:from-slate-900 dark:to-background">
+      <header className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-4">
+        <div className="flex items-center gap-2 font-semibold">
+          <span className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
+            <Sparkles className="w-4 h-4" />
+          </span>
+          Resume Creator AI
         </div>
+        <nav className="ml-auto flex items-center gap-1">
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/resumes">My resumes</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/about">About</Link>
+          </Button>
+          <ThemeToggle compact />
+          <UserMenu />
+        </nav>
+      </header>
 
-        {/* Features Grid */}
-        <div className="grid md:grid-cols-3 gap-8 mb-16">
-          <Card className="resume-shadow resume-hover">
-            <CardHeader>
-              <div className="w-12 h-12 rounded-xl bg-resume-blue/10 flex items-center justify-center mb-4">
-                <Palette className="w-6 h-6 text-resume-blue" />
-              </div>
-              <CardTitle>6 Professional Templates</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-text-secondary">
-                Choose from modern templates designed for different industries and career levels.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="resume-shadow resume-hover">
-            <CardHeader>
-              <div className="w-12 h-12 rounded-xl bg-resume-green/10 flex items-center justify-center mb-4">
-                <Zap className="w-6 h-6 text-resume-green" />
-              </div>
-              <CardTitle>ATS-Friendly</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-text-secondary">
-                All templates are optimized for Applicant Tracking Systems with selectable text.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="resume-shadow resume-hover">
-            <CardHeader>
-              <div className="w-12 h-12 rounded-xl bg-resume-purple/10 flex items-center justify-center mb-4">
-                <Download className="w-6 h-6 text-resume-purple" />
-              </div>
-              <CardTitle>PDF Download</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-text-secondary">
-                Download your resume as a perfectly formatted PDF that fits on one page.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* CTA Section */}
-        <div className="text-center">
-          <Card className="max-w-2xl mx-auto resume-shadow">
-            <CardContent className="pt-8">
-              <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
-              <p className="text-text-secondary mb-6">
-                Join thousands of job seekers who have created professional resumes with our builder.
-              </p>
-              <Button asChild size="lg" className="resume-hover">
-                <Link to="/resume-maker">
-                  Create Your Resume Now
-                </Link>
+      <main className="mx-auto max-w-6xl px-4 pb-16">
+        <section className="py-12 md:py-20 text-center max-w-3xl mx-auto">
+          <p className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground">Resume Creator AI · free AI resume builder</p>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Tailor your resume to every job — truthfully.</h1>
+          <p className="mt-4 text-lg text-muted-foreground">Upload your resume once, paste a job description, and refine an ATS-friendly version through conversation until it is exactly right.</p>
+          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+            <Button size="lg" asChild>
+              <Link to="/builder">Build an ATS resume</Link>
+            </Button>
+            {last && (
+              <Button size="lg" variant="outline" asChild>
+                <Link to={`/builder/${last.id}`}>Continue “{last.title.length > 28 ? `${last.title.slice(0, 28)}…` : last.title}”</Link>
               </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+            )}
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Prefer free-form design? The <Link to="/resume-maker" className="underline">classic editor</Link> is still available.
+          </p>
+        </section>
+
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map(({ icon: Icon, title, text }) => (
+            <div key={title} className="rounded-xl border bg-background p-5">
+              <Icon className="w-5 h-5 text-primary mb-3" />
+              <h2 className="font-semibold">{title}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{text}</p>
+            </div>
+          ))}
+        </section>
+      </main>
     </div>
   );
 };

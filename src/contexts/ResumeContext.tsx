@@ -214,16 +214,23 @@ const loadPersistedState = (): ResumeState => {
   }
 };
 
-export const ResumeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [state, dispatch] = useReducer(resumeReducer, initialState, loadPersistedState);
+/**
+ * `initialData` seeds the editor (used by the ATS builder's manual editor);
+ * `persist={false}` keeps that editor out of the legacy localStorage slot.
+ */
+export const ResumeProvider: React.FC<{ children: ReactNode; initialData?: ResumeData; persist?: boolean; onChange?: (data: ResumeData) => void }> = ({ children, initialData, persist = true, onChange }) => {
+  const [state, dispatch] = useReducer(resumeReducer, initialState, (init) => (initialData ? { ...init, resumeData: initialData } : loadPersistedState()));
 
   useEffect(() => {
+    onChange?.(state.resumeData);
+    if (!persist) return;
     try {
       window.localStorage.setItem('resume-studio-resume-data', JSON.stringify(state.resumeData));
     } catch {
       // Large original PDFs or a browser storage quota should never break editing.
     }
-  }, [state.resumeData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.resumeData, persist]);
 
   const updatePersonalInfo = (data: Partial<ResumeData['personalInfo']>) => {
     dispatch({ type: 'UPDATE_PERSONAL_INFO', payload: data });
